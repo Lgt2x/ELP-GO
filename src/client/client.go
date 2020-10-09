@@ -18,7 +18,7 @@ func main() {
 	conn, err := net.Dial("tcp", "localhost:"+PORT)
 	defer conn.Close()
 
-	if (err != nil){
+	if err != nil {
 		return
 	}
 
@@ -57,11 +57,11 @@ func sendString(conn net.Conn, chaine string) {
 	io.WriteString(conn, fmt.Sprint(chaine))
 }
 
-func inputString() (string) {
+func inputString() string {
 	reader := bufio.NewReader(os.Stdin)
 	fmt.Print("> ")
 	filtre, err := reader.ReadString('\n')
-	if (err != nil) {
+	if err != nil {
 		panic(err)
 	}
 	return filtre
@@ -74,7 +74,7 @@ func saisieFiltre(conn net.Conn) {
 	validationServer := receiveString(conn, '\n')
 	filtre_valide := strings.Compare(validationServer[0:1], "1")
 
-	if (filtre_valide != 0) {
+	if filtre_valide != 0 {
 		saisieFiltre(conn)
 	}
 }
@@ -118,11 +118,10 @@ func uploadFile(conn net.Conn, srcFile string) {
 func receiveFile(conn net.Conn, dstFile string) {
 	// create new file
 	fo, err := os.Create(dstFile)
-	if (err != nil) {
+	if err != nil {
 		return
 	}
 	os.Open(dstFile)
-
 
 	// accept file from client & write to new file
 	_, err = io.Copy(fo, conn)
@@ -133,7 +132,7 @@ func receiveFile(conn net.Conn, dstFile string) {
 
 func receiveString(conn net.Conn, delimiter byte) string {
 	message, err := bufio.NewReader(conn).ReadString(delimiter)
-	if (err != nil) {
+	if err != nil {
 		panic(err)
 	}
 	return message

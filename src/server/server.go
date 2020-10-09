@@ -8,7 +8,7 @@ import (
 	"os"
 )
 
-func handleConnection(c net.Conn, numconn int){
+func handleConnection(c net.Conn, numconn int) {
 	fmt.Println("New connection with a client")
 
 	// envoi des possibilités de filtres
@@ -18,7 +18,7 @@ func handleConnection(c net.Conn, numconn int){
 	// réception du filtre, vérification de la validité et renvoi d'un caractère (1: choix valide, 0: choix invalide)
 	// si 1, passage au point suivant
 	validationFiltre := false
-	for (validationFiltre != true){
+	for validationFiltre != true {
 		choixFiltre := receiveString(c)
 		fmt.Println(choixFiltre)
 
@@ -78,7 +78,7 @@ func main() {
 
 	numconn := 1
 
-	fmt.Println("Server TCP created on port "+PORT)
+	fmt.Println("Server TCP created on port " + PORT)
 
 	for {
 		conn, err := ln.Accept()
@@ -95,7 +95,7 @@ func main() {
 func receiveFile(conn net.Conn, dstFile string) {
 	// create new file
 	fo, err := os.Create(dstFile)
-	if (err != nil) {
+	if err != nil {
 		fmt.Println("Erreur création fichier")
 		return
 	}
@@ -113,7 +113,7 @@ func receiveFile(conn net.Conn, dstFile string) {
 func uploadFile(conn net.Conn, srcFile string) {
 	// open file to upload
 	fi, err := os.Open(srcFile)
-	if (err != nil) {
+	if err != nil {
 		return
 	}
 
@@ -132,7 +132,7 @@ func deleteFile(filename string) {
 func receiveString(conn net.Conn) string {
 	// read the buffer
 	message, err := bufio.NewReader(conn).ReadString('\n')
-	if (err != nil) {
+	if err != nil {
 		panic(err)
 	}
 	// return the message minus the last element (like \n)
