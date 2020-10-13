@@ -6,7 +6,11 @@ import (
 	"io"
 	"net"
 	"os"
+	"strconv"
+	"strings"
 )
+
+const BUFFERSIZE = 1024
 
 func handleConnection(c net.Conn, numconn int){
 	fmt.Println("New connection with a client")
@@ -17,6 +21,44 @@ func handleConnection(c net.Conn, numconn int){
 
 	// réception du filtre, vérification de la validité et renvoi d'un caractère (1: choix valide, 0: choix invalide)
 	// si 1, passage au point suivant
+	valideFiltre(c)
+
+	// réception nom image
+	fmt.Println("Nom image")
+	fileName := receiveString(c)
+	fmt.Println(fileName)
+
+	// attente de réception de l'image
+	fmt.Println("Réception de l'image")
+	receiveFile(c)
+
+	// appliquer le filtre
+	fmt.Println("Application du filtre")
+	fileModified := newName(fileName)
+
+	// rename the file
+	fmt.Println("Rename the file")
+	os.Rename(fileName, fileModified)
+
+	// renvoyer le fichier avec le nom modifié
+	uploadFile(c, fileModified)
+
+
+	// fermer la connection
+	c.Close()
+	fmt.Println("Goodbye", numconn)
+
+	// supprimer le fichier d'image
+	deleteFile(fileModified)
+}
+
+func newName(filename string) string {
+	// find the extension, store it then delete it
+	indexExt := strings.Index(filename, ".")
+	return filename[:indexExt] + "_modified"+filename[indexExt:]
+}
+
+func valideFiltre(c net.Conn) {
 	validationFiltre := false
 	for (validationFiltre != true){
 		choixFiltre := receiveString(c)
@@ -34,34 +76,6 @@ func handleConnection(c net.Conn, numconn int){
 			sendString(c, "0\n")
 		}
 	}
-
-	// attente de réception du nom de l'image
-	fmt.Println("Attente de la réception du nom de l'image")
-	filename := receiveString(c)
-	fmt.Println("Nom image: ", filename)
-
-	// attente de réception de l'image
-	fmt.Println("Réception de l'image")
-	receiveFile(c, filename)
-
-	// appliquer le filtre
-	fmt.Println("Application du filtre")
-
-	// envoi du nouveau nom
-	//sendString(c, "image_modifiee.txt\n")
-
-	// renvoyer le fichier avec le nom modifié
-	//uploadFile(c, "image_modifiee.txt")
-
-	// fermer la connection
-	c.Close()
-
-	// supprimer le fichier d'image
-	deleteFile("image_modifiee.txt")
-}
-
-func valideFiltre(c net.Conn) {
-
 }
 
 func main() {
@@ -92,33 +106,66 @@ func main() {
 	}
 }
 
-func receiveFile(conn net.Conn, dstFile string) {
-	// create new file
-	fo, err := os.Create(dstFile)
-	if (err != nil) {
-		fmt.Println("Erreur création fichier")
-		return
-	}
-	//fmt.Println("Création fichier réussie")
+func receiveFile(conn net.Conn) {
+	bufferFileName := make([]byte, 64)
+	bufferFileSize := make([]byte, 10)
 
-	// accept file from client & write to new file
-	_, err = io.Copy(fo, conn)
+	conn.Read(bufferFileSize)
+	fileSize, _ := strconv.ParseInt(strings.Trim(string(bufferFileSize), ":"), 10, 64)
+
+	conn.Read(bufferFileName)
+	fileName := strings.Trim(string(bufferFileName), ":")
+
+	newFile, err := os.Create(fileName)
+
 	if err != nil {
-		fmt.Println("Erreur réception fichier")
-		return
+		panic(err)
 	}
-	fmt.Println("Fin de réception du fichier")
+	defer newFile.Close()
+	var receivedBytes int64
+
+	fmt.Println("Start receiving")
+	for {
+		if (fileSize - receivedBytes) < BUFFERSIZE {
+			io.CopyN(newFile, conn, (fileSize - receivedBytes))
+			conn.Read(make([]byte, (receivedBytes+BUFFERSIZE)-fileSize))
+			break
+		}
+		io.CopyN(newFile, conn, BUFFERSIZE)
+		receivedBytes += BUFFERSIZE
+	}
+	fmt.Println("Received file completely!")
 }
 
 func uploadFile(conn net.Conn, srcFile string) {
-	// open file to upload
-	fi, err := os.Open(srcFile)
-	if (err != nil) {
+	file, err := os.Open(srcFile)
+	if err != nil {
+		fmt.Println(err)
 		return
 	}
+	fileInfo, err := file.Stat()
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+	fileSize := fillString(strconv.FormatInt(fileInfo.Size(), 10), 10)
+	fileName := fillString(fileInfo.Name(), 64)
+	fmt.Println("Sending filename and filesize!")
+	conn.Write([]byte(fileSize))
+	conn.Write([]byte(fileName))
+	sendBuffer := make([]byte, BUFFERSIZE)
+	fmt.Println("Start sending file!")
+	for {
+		_, err = file.Read(sendBuffer)
 
-	// upload
-	_, err = io.Copy(conn, fi)
+		if err == io.EOF {
+			break
+		}
+
+		conn.Write(sendBuffer)
+	}
+	fmt.Println("File has been sent")
+	return
 }
 
 func deleteFile(filename string) {
@@ -142,4 +189,16 @@ func receiveString(conn net.Conn) string {
 func sendString(conn net.Conn, chaine string) {
 	// send the string chaine on the connection conn
 	io.WriteString(conn, fmt.Sprint(chaine))
+}
+
+func fillString(retunString string, toLength int) string {
+	for {
+		lengtString := len(retunString)
+		if lengtString < toLength {
+			retunString = retunString + ":"
+			continue
+		}
+		break
+	}
+	return retunString
 }
