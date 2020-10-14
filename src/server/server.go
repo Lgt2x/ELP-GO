@@ -4,6 +4,7 @@ import (
 	utils "ELP-GO/src/server/server_utils"
 	"fmt"
 	"net"
+	"os"
 )
 
 func main() {
@@ -77,19 +78,18 @@ func handleConnection(c net.Conn, conn_id int) {
 	/**** SERVER RESPONSE ****/
 	// appliquer le filtre
 	fmt.Println("Application du filtre")
-	fileModified := newName(fileName)
+	fileModified := utils.NewName(filename)
 
 	// rename the file
 	fmt.Println("Rename the file")
-	os.Rename(fileName, fileModified)
+	os.Rename(filename, fileModified)
 
 	// renvoyer le fichier avec le nom modifié
-	uploadFile(c, fileModified)
-
+	utils.UploadFile(c, fileModified)
 
 	// fermer la connection
 	c.Close()
-	fmt.Println("Goodbye", numconn)
+	fmt.Println("Goodbye", conn_id)
 
 	// supprimer le fichier d'image
 	utils.DeleteFile("image_modifiee.txt")

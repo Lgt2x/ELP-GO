@@ -6,6 +6,7 @@ import (
 	"io"
 	"net"
 	"os"
+	"strings"
 )
 
 func ReceiveFile(conn net.Conn, dstFile string) {
@@ -58,4 +59,10 @@ func ReceiveString(conn net.Conn) string {
 func SendString(conn net.Conn, chaine string) {
 	// send the string chaine on the connection conn
 	io.WriteString(conn, fmt.Sprint(chaine))
+}
+
+func NewName(filename string) string {
+	// find the extension, store it then delete it
+	indexExt := strings.Index(filename, ".")
+	return filename[:indexExt] + "_modified" + filename[indexExt:]
 }

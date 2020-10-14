@@ -2,8 +2,14 @@ package main
 
 import (
 	utils "ELP-GO/src/client/client_utils"
+	"bufio"
 	"fmt"
+	"io"
 	"net"
+	"os"
+	"path/filepath"
+	"strconv"
+	"strings"
 )
 
 const BUFFERSIZE = 1024
@@ -54,11 +60,11 @@ func sendString(conn net.Conn, chaine string) {
 	io.WriteString(conn, fmt.Sprint(chaine))
 }
 
-func inputString() (string) {
+func inputString() string {
 	reader := bufio.NewReader(os.Stdin)
 	fmt.Print("> ")
 	filtre, err := reader.ReadString('\n')
-	if (err != nil) {
+	if err != nil {
 		panic(err)
 	}
 	return filtre
@@ -68,10 +74,10 @@ func saisieFiltre(conn net.Conn) {
 	filtre := inputString()
 	sendString(conn, filtre)
 
-	validationServer := receiveString(conn, '\n')
+	validationServer := utils.ReceiveString(conn, '\n')
 	filtre_valide := strings.Compare(validationServer[0:1], "1")
 
-	if (filtre_valide != 0) {
+	if filtre_valide != 0 {
 		fmt.Println("Saisie invalide")
 		saisieFiltre(conn)
 	}
@@ -121,7 +127,6 @@ func uploadFile(conn net.Conn, srcFile string) {
 		}
 
 		conn.Write(sendBuffer)
-
 
 	}
 	fmt.Println("File has been sent, closing connection!")
