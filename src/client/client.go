@@ -1,14 +1,9 @@
 package main
 
 import (
-	"bufio"
+	utils "ELP-GO/src/client/client_utils"
 	"fmt"
-	"io"
 	"net"
-	"os"
-	"path/filepath"
-	"strconv"
-	"strings"
 )
 
 const BUFFERSIZE = 1024
@@ -21,32 +16,36 @@ func main() {
 	conn, err := net.Dial("tcp", "localhost:"+PORT)
 	defer conn.Close()
 
-	if (err != nil){
+	if err != nil {
 		return
 	}
 
 	// attendre réception liste filtres serveurs
-	listeFiltres := receiveString(conn, '\t')
-	fmt.Println(listeFiltres)
+	listeFilters := utils.ReceiveString(conn, '\t')
+	fmt.Println(listeFilters)
 
 	// saisie du filtre
-	saisieFiltre(conn)
+	utils.InputFilter(conn)
 
 	// saisie nom fichier image + validation (exist or not)
-	image_path, image_path_abs := inputImagePath()
+	image_path, image_path_abs := utils.InputImagePath()
 
 	// envoi nom image on envoie le chemin relatif car on est en local + soucis de creation
 	fmt.Println("Envoi du nom de l'image")
-	sendString(conn, image_path+"\n")
+	utils.SendString(conn, image_path+"\n")
 
 	// envoi de l'image
 	// time.Sleep(1 * time.Second)
 	fmt.Println("Envoi de l'image:", image_path_abs)
-	uploadFile(conn, image_path)
+	utils.UploadFile(conn, image_path)
+	//time.Sleep(1 * time.Second)
 
-	// attente réception image modifiée
-	fmt.Println("Attente de l'image modifiée")
-	//receiveFile(conn, filename_modified)
+	// attente réception nom image modifiée
+	fmt.Println("Attente réception nom de l'image modifiée")
+	//filename_modified := receiveString(conn, '\n')
+	//fmt.Println(filename_modified)
+
+	//utils.ReceiveFile(conn, image_path[:len(image_path)-4]+"_modified.txt")
 	receiveFile(conn)
 }
 
@@ -170,12 +169,4 @@ func receiveFile(conn net.Conn) {
 		receivedBytes += BUFFERSIZE
 	}
 	fmt.Println("Received file completely!")
-}
-
-func receiveString(conn net.Conn, delimiter byte) string {
-	message, err := bufio.NewReader(conn).ReadString(delimiter)
-	if (err != nil) {
-		panic(err)
-	}
-	return message
 }
