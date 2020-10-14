@@ -1,7 +1,7 @@
 package main
 
 import (
-	utils "ELP-GO/src/server/server_utils"
+	utils "server/server_utils"
 	"fmt"
 	"net"
 	"os"

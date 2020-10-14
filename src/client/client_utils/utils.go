@@ -87,7 +87,7 @@ func UploadFile(conn net.Conn, srcFile string) {
 		conn.Write(sendBuffer)
 
 	}
-	fmt.Println("File has been sent, closing connection!")
+	fmt.Println("File has been sent")
 	return
 }
 

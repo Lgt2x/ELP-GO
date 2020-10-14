@@ -1,9 +1,10 @@
 package main
 
 import (
-	utils "ELP-GO/src/client/client_utils"
+	utils "client/client_utils"
 	"fmt"
 	"net"
+	"os"
 )
 
 const BUFFERSIZE = 1024
@@ -28,6 +29,10 @@ func main() {
 
 	// saisie du filtre
 	utils.InputFilter(conn)
+
+	// affichage chemin
+	dir, err := os.Getwd()
+	fmt.Println(dir)
 
 	// saisie nom fichier image + validation (exist or not)
 	image_path, image_path_abs := utils.InputImagePath()
