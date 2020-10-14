@@ -77,15 +77,19 @@ func handleConnection(c net.Conn, conn_id int) {
 	/**** SERVER RESPONSE ****/
 	// appliquer le filtre
 	fmt.Println("Application du filtre")
+	fileModified := newName(fileName)
 
-	// envoi du nouveau nom
-	//sendString(c, "image_modifiee.txt\n")
+	// rename the file
+	fmt.Println("Rename the file")
+	os.Rename(fileName, fileModified)
 
 	// renvoyer le fichier avec le nom modifié
-	//uploadFile(c, "image_modifiee.txt")
+	uploadFile(c, fileModified)
+
 
 	// fermer la connection
 	c.Close()
+	fmt.Println("Goodbye", numconn)
 
 	// supprimer le fichier d'image
 	utils.DeleteFile("image_modifiee.txt")
