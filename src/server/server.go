@@ -38,59 +38,41 @@ func main() {
 	}
 }
 
-func handleConnection(c net.Conn, conn_id int) {
-	fmt.Println("Handling connection %v", conn_id)
+func handleConnection(c net.Conn, numconn int) {
+	fmt.Println("New connection with a client")
 
-	/******* INPUT HANDLING *****/
 	// envoi des possibilités de filtres
 	liste_filtres := "1. Noir et blanc \n2. Autre filtre"
 	utils.SendString(c, liste_filtres+"\t")
 
 	// réception du filtre, vérification de la validité et renvoi d'un caractère (1: choix valide, 0: choix invalide)
 	// si 1, passage au point suivant
-	validationFiltre := false
-	for validationFiltre != true {
-		choixFiltre := utils.ReceiveString(c)
-		fmt.Println(choixFiltre)
+	utils.ValideFiltre(c)
 
-		switch choixFiltre {
-		// enumeration des choix valides
-		case "1":
-			// validation et go pour machin truc
-			fmt.Println("Choix valide")
-			validationFiltre = true
-			utils.SendString(c, "1\n")
-		default:
-			fmt.Println("Choix invalide")
-			utils.SendString(c, "0\n")
-		}
-	}
-
-	// attente de réception du nom de l'image
-	fmt.Println("Attente de la réception du nom de l'image")
-	filename := utils.ReceiveString(c)
-	fmt.Println("Nom image: ", filename)
+	// réception nom image
+	fmt.Println("Nom image")
+	fileName := utils.ReceiveString(c)
+	fmt.Println(fileName)
 
 	// attente de réception de l'image
 	fmt.Println("Réception de l'image")
-	utils.ReceiveFile(c, filename)
+	utils.ReceiveFile(c)
 
-	/**** SERVER RESPONSE ****/
 	// appliquer le filtre
 	fmt.Println("Application du filtre")
-	fileModified := utils.NewName(filename)
+	fileModified := utils.NewName(fileName)
 
 	// rename the file
 	fmt.Println("Rename the file")
-	os.Rename(filename, fileModified)
+	os.Rename(fileName, fileModified)
 
 	// renvoyer le fichier avec le nom modifié
 	utils.UploadFile(c, fileModified)
 
 	// fermer la connection
 	c.Close()
-	fmt.Println("Goodbye", conn_id)
+	fmt.Println("Goodbye", numconn)
 
 	// supprimer le fichier d'image
-	utils.DeleteFile("image_modifiee.txt")
+	utils.DeleteFile(fileModified)
 }

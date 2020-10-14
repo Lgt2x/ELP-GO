@@ -7,10 +7,14 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 )
 
+const BUFFERSIZE = 1024
+
 func SendString(conn net.Conn, chaine string) {
+	// send the string chaine
 	io.WriteString(conn, fmt.Sprint(chaine))
 }
 
@@ -32,13 +36,13 @@ func InputFilter(conn net.Conn) {
 	filtre_valide := strings.Compare(validationServer[0:1], "1")
 
 	if filtre_valide != 0 {
-		// Try again
+		fmt.Println("Saisie invalide")
 		InputFilter(conn)
 	}
 }
 
 func InputImagePath() (string, string) {
-	fmt.Print("Saisie du chemin de l'image: ")
+	fmt.Print("Saisie du chemin de l'image (relatif): ")
 	image_path := InputString()
 	image_path_abs, _ := filepath.Abs(image_path[:len(image_path)-1])
 
@@ -56,36 +60,78 @@ func FileExists(filepath string) bool {
 }
 
 func UploadFile(conn net.Conn, srcFile string) {
-	// open file to upload
-	fi, err := os.Open(srcFile)
-	defer fi.Close()
-
+	file, err := os.Open(srcFile)
 	if err != nil {
+		fmt.Println(err)
 		return
 	}
-
-	// upload
-	_, err = io.Copy(conn, fi)
+	fileInfo, err := file.Stat()
 	if err != nil {
+		fmt.Println(err)
 		return
 	}
-	fmt.Println("Fin de l'upload")
+	fileSize := FillString(strconv.FormatInt(fileInfo.Size(), 10), 10)
+	fileName := FillString(fileInfo.Name(), 64)
+	fmt.Println("Sending filename and filesize!")
+	conn.Write([]byte(fileSize))
+	conn.Write([]byte(fileName))
+	sendBuffer := make([]byte, BUFFERSIZE)
+	fmt.Println("Start sending file!")
+	for {
+		_, err = file.Read(sendBuffer)
 
+		if err == io.EOF {
+			break
+		}
+
+		conn.Write(sendBuffer)
+
+	}
+	fmt.Println("File has been sent, closing connection!")
+	return
 }
 
-func ReceiveFile(conn net.Conn, dstFile string) {
-	// create new file
-	fo, err := os.Create(dstFile)
-	if err != nil {
-		return
+func FillString(retunString string, toLength int) string {
+	for {
+		lengtString := len(retunString)
+		if lengtString < toLength {
+			retunString = retunString + ":"
+			continue
+		}
+		break
 	}
-	os.Open(dstFile)
+	return retunString
+}
 
-	// accept file from client & write to new file
-	_, err = io.Copy(fo, conn)
+func ReceiveFile(conn net.Conn) {
+	bufferFileName := make([]byte, 64)
+	bufferFileSize := make([]byte, 10)
+
+	conn.Read(bufferFileSize)
+	fileSize, _ := strconv.ParseInt(strings.Trim(string(bufferFileSize), ":"), 10, 64)
+
+	conn.Read(bufferFileName)
+	fileName := strings.Trim(string(bufferFileName), ":")
+
+	newFile, err := os.Create(fileName)
+
 	if err != nil {
-		return
+		panic(err)
 	}
+	defer newFile.Close()
+	var receivedBytes int64
+
+	fmt.Println("Start receiving")
+	for {
+		if (fileSize - receivedBytes) < BUFFERSIZE {
+			io.CopyN(newFile, conn, (fileSize - receivedBytes))
+			conn.Read(make([]byte, (receivedBytes+BUFFERSIZE)-fileSize))
+			break
+		}
+		io.CopyN(newFile, conn, BUFFERSIZE)
+		receivedBytes += BUFFERSIZE
+	}
+	fmt.Println("Received file completely!")
 }
 
 func ReceiveString(conn net.Conn, delimiter byte) string {

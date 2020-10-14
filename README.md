@@ -6,7 +6,7 @@ Projet en Golang de serveur TCP effectuant du traitement d'image, en utilisant l
 ```
 go run src/server/server.go
 
-In another terminal...
+# In another terminal...
 go run src/client/client.go
 ```
 

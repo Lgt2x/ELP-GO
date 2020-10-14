@@ -6,36 +6,98 @@ import (
 	"io"
 	"net"
 	"os"
+	"strconv"
 	"strings"
 )
 
-func ReceiveFile(conn net.Conn, dstFile string) {
-	// create new file
-	fo, err := os.Create(dstFile)
-	if err != nil {
-		fmt.Println("Erreur création fichier")
-		return
-	}
-	//fmt.Println("Création fichier réussie")
+const BUFFERSIZE = 1024
 
-	// accept file from client & write to new file
-	_, err = io.Copy(fo, conn)
-	if err != nil {
-		fmt.Println("Erreur réception fichier")
-		return
+func NewName(filename string) string {
+	// find the extension, store it then delete it
+	indexExt := strings.Index(filename, ".")
+	return filename[:indexExt] + "_modified" + filename[indexExt:]
+}
+
+func ValideFiltre(c net.Conn) {
+	validationFiltre := false
+	for validationFiltre != true {
+		choixFiltre := ReceiveString(c)
+		fmt.Println(choixFiltre)
+
+		switch choixFiltre {
+		// enumeration des choix valides
+		case "1":
+			// validation et go pour machin truc
+			fmt.Println("Choix valide")
+			validationFiltre = true
+			SendString(c, "1\n")
+		default:
+			fmt.Println("Choix invalide")
+			SendString(c, "0\n")
+		}
 	}
-	fmt.Println("Fin de réception du fichier")
+}
+
+func ReceiveFile(conn net.Conn) {
+	bufferFileName := make([]byte, 64)
+	bufferFileSize := make([]byte, 10)
+
+	conn.Read(bufferFileSize)
+	fileSize, _ := strconv.ParseInt(strings.Trim(string(bufferFileSize), ":"), 10, 64)
+
+	conn.Read(bufferFileName)
+	fileName := strings.Trim(string(bufferFileName), ":")
+
+	newFile, err := os.Create(fileName)
+
+	if err != nil {
+		panic(err)
+	}
+	defer newFile.Close()
+	var receivedBytes int64
+
+	fmt.Println("Start receiving")
+	for {
+		if (fileSize - receivedBytes) < BUFFERSIZE {
+			io.CopyN(newFile, conn, (fileSize - receivedBytes))
+			conn.Read(make([]byte, (receivedBytes+BUFFERSIZE)-fileSize))
+			break
+		}
+		io.CopyN(newFile, conn, BUFFERSIZE)
+		receivedBytes += BUFFERSIZE
+	}
+	fmt.Println("Received file completely!")
 }
 
 func UploadFile(conn net.Conn, srcFile string) {
-	// open file to upload
-	fi, err := os.Open(srcFile)
+	file, err := os.Open(srcFile)
 	if err != nil {
+		fmt.Println(err)
 		return
 	}
+	fileInfo, err := file.Stat()
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+	fileSize := FillString(strconv.FormatInt(fileInfo.Size(), 10), 10)
+	fileName := FillString(fileInfo.Name(), 64)
+	fmt.Println("Sending filename and filesize!")
+	conn.Write([]byte(fileSize))
+	conn.Write([]byte(fileName))
+	sendBuffer := make([]byte, BUFFERSIZE)
+	fmt.Println("Start sending file!")
+	for {
+		_, err = file.Read(sendBuffer)
 
-	// upload
-	_, err = io.Copy(conn, fi)
+		if err == io.EOF {
+			break
+		}
+
+		conn.Write(sendBuffer)
+	}
+	fmt.Println("File has been sent")
+	return
 }
 
 func DeleteFile(filename string) {
@@ -61,8 +123,14 @@ func SendString(conn net.Conn, chaine string) {
 	io.WriteString(conn, fmt.Sprint(chaine))
 }
 
-func NewName(filename string) string {
-	// find the extension, store it then delete it
-	indexExt := strings.Index(filename, ".")
-	return filename[:indexExt] + "_modified" + filename[indexExt:]
+func FillString(retunString string, toLength int) string {
+	for {
+		lengtString := len(retunString)
+		if lengtString < toLength {
+			retunString = retunString + ":"
+			continue
+		}
+		break
+	}
+	return retunString
 }
