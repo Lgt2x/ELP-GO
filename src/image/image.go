@@ -61,49 +61,81 @@ func negatifNB(image2 image.Image) image.Image {
 	return imgNeg
 }
 
-func negatifRVB(image2 image.Image) image.Image { //pb fait de la merde
+func negatifRVB(image2 image.Image) image.Image {
 	imgNeg := image.NewRGBA(image2.Bounds())
 	for y := image2.Bounds().Min.Y; y < image2.Bounds().Max.Y; y++ {
 		for x := image2.Bounds().Min.X; x < image2.Bounds().Max.X; x++ {
 			r, v, b, _ := image2.At(x, y).RGBA()
-			pix := color.RGBA{R: 255 - uint8(r), G: 255 - uint8(v), B: 255 - uint8(b), A: 0xff}
+			pix := color.RGBA{R: 255 - uint8(r/255), G: 255 - uint8(v/255), B: 255 - uint8(b/255), A: 0xff}
 			imgNeg.Set(x, y, pix)
 		}
 	}
 	return imgNeg
 }
 
-func gauss(et float64) [3][3]uint8 {
-	var res [3][3]uint8
+func gauss(et float64) ([3][3]float64, float64) {
+	var res [3][3]float64
+	//var sommeLignes [3]float64
+	var somme float64
 
-	for x := 0; x < 3; x++ {
-		for y := 0; y < 3; y++ {
-			res[x][y] = uint8(100 * math.Exp(-(math.Pow(float64(x), 2)+math.Pow(float64(y), 2))/2*math.Pow(et, 2)) / (2 * math.Pi * math.Pow(et, 2)))
+	for x := -1; x <= 1; x++ {
+		for y := -1; y <= 1; y++ {
+			res[x+1][y+1] = 100 * math.Exp(-(math.Pow(float64(x), 2)+math.Pow(float64(y), 2))/2*math.Pow(et, 2)) / (2 * math.Pi * math.Pow(et, 2))
+			//sommeLignes[x+1] += res[x+1][y+1]
+			somme += res[x+1][y+1]
 		}
 	}
-	return res //calcul de la matrice de convolution du filtre de gauss en fonction de l'écart-type
+
+	fmt.Println(somme)
+	/*
+		for a:=0; a<3; a++{ //on fait la somme des lignes, y'a t-il besoin de la normaliser?
+			for b:=0; b<3; b++ {
+				sommeLignes[a] += res[a][b]
+			}
+		}
+
+
+		for i:=0; i<3; i++{
+			for j:=0; j<3; j++ {
+				res[i][j] = res[i][j]/sommeLignes[i] //normlisation de la matrice
+			}
+		}
+
+
+
+	*/
+	return res, somme //calcul de la matrice de convolution du filtre de gauss en fonction de l'écart-type
 }
 
-func convolution(x int, y int, img image.Image, coeff [3][3]uint8) color.RGBA {
+func convolution(x int, y int, img image.Image, coeff [3][3]float64, somme float64) color.RGBA {
+	//fmt.Println(coeff)
 	var pix color.RGBA
+	var r, v, b float64
+	r = 0
+	v = 0
+	b = 0
 	for i := -1; i <= 1; i++ {
 		for j := -1; j <= 1; j++ {
-			rouge, vert, bleu, _ := img.At(y+i, x+j).RGBA()
-			r := coeff[i+1][j+1] * uint8(rouge) / 9.0
-			v := coeff[i+1][j+1] * uint8(vert) / 9.0
-			b := coeff[i+1][j+1] * uint8(bleu) / 9.0
-			pix = color.RGBA{r, v, b, 0xff}
+			rouge, vert, bleu, _ := img.At(x+i, y+j).RGBA()
+			r += coeff[i+1][j+1] * float64(rouge)
+			v += coeff[i+1][j+1] * float64(vert)
+			b += coeff[i+1][j+1] * float64(bleu)
+
 		}
 	}
+	pix = color.RGBA{R: uint8(r / (255 * somme)), G: uint8(v / (255 * somme)), B: uint8(b / (255 * somme)), A: 0xff} //retour de la couleur du pixel normalisé x255 car la fct rgba renvoie des uint32 multipliés par alpha qui vaut 255 ici
+	//fmt.Println(pix)
 	return pix
 }
 
-func flouGauss(image2 image.Image) image.Image { //marche pas
+func flouGauss(image2 image.Image) image.Image {
 	imgFlou := image.NewRGBA(image2.Bounds())
-	coeff := gauss(1.5)
-	for y := image2.Bounds().Min.Y + 2; y < image2.Bounds().Max.Y-2; y++ {
-		for x := image2.Bounds().Min.X + 2; x < image2.Bounds().Max.X-2; x++ {
-			imgFlou.Set(x, y, convolution(x, y, image2, coeff))
+	coeff := [3][3]float64{{1, 1, 1}, {1, 1, 1}, {1, 1, 1}}
+	somme := 9.0
+	//coeff, somme := gauss(0.95)
+	for y := image2.Bounds().Min.Y + 1; y < image2.Bounds().Max.Y-1; y++ {
+		for x := image2.Bounds().Min.X + 1; x < image2.Bounds().Max.X-1; x++ {
+			imgFlou.Set(x, y, convolution(x, y, image2, coeff, somme))
 		}
 	}
 
@@ -114,5 +146,5 @@ func main() {
 
 	image := importImage()
 	//niveauGris(image) //renvoie l'image traitée dans le répertoire courant
-	ecritureFichier(flouGauss(image))
+	ecritureFichier(negatifRVB(image))
 }
