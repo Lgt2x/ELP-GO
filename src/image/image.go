@@ -21,7 +21,7 @@ func ecritureFichier(image2 image.Image) {
 }
 
 func importImage() image.Image {
-	input, err := os.Open("C:/Users/antoi/pictures/noise3.jpg")
+	input, err := os.Open("C:/Users/antoi/pictures/noise4.jpg")
 	img, err := jpeg.Decode(input)
 
 	if err != nil {
@@ -93,12 +93,7 @@ func convolution(x int, y int, img image.Image, coeff [3][3]float64, somme float
 	return pix
 }
 
-func convolutionGauss(x int, y int, img image.Image, n int) color.RGBA { //convolution avec la fonction de gauss avec une matrice de taille n
-	var pix color.RGBA
-	var r, v, b float64
-	r = 0
-	v = 0
-	b = 0
+func calculGauss(n int) ([][]float64, float64) {
 
 	coeff := make([][]float64, n) //création d'une matrice vide de taille n*n
 	for i := 0; i < n; i++ {
@@ -115,6 +110,16 @@ func convolutionGauss(x int, y int, img image.Image, n int) color.RGBA { //convo
 		}
 	}
 
+	return coeff, somme
+}
+
+func convolutionGauss(x int, y int, img image.Image, n int, coeff [][]float64, somme float64) color.RGBA { //convolution avec la fonction de gauss avec une matrice de taille n
+	var pix color.RGBA
+	var r, v, b float64
+	r = 0
+	v = 0
+	b = 0
+
 	for i := -n / 2; i <= n/2; i++ {
 		for j := -n / 2; j <= n/2; j++ {
 			rouge, vert, bleu, _ := img.At(x+i, y+j).RGBA()
@@ -128,11 +133,13 @@ func convolutionGauss(x int, y int, img image.Image, n int) color.RGBA { //convo
 	return pix
 }
 
-func flouGauss(img image.Image, n int) image.Image { //flou de gauss avec matrice de taille n (plus n est grand plus le l'effet est important)
+func flouGauss(img image.Image, n int) image.Image { //flou de gauss avec matrice de taille n (plus n est grand plus l'effet est important), peut-etre faire plusieurs itérations
 	imgFlou := image.NewRGBA(img.Bounds())
+	coeff, somme := calculGauss(n)
+
 	for y := img.Bounds().Min.Y + 2; y < img.Bounds().Max.Y-2; y++ {
 		for x := img.Bounds().Min.X + 2; x < img.Bounds().Max.X-2; x++ {
-			imgFlou.Set(x, y, convolutionGauss(x, y, img, n))
+			imgFlou.Set(x, y, convolutionGauss(x, y, img, n, coeff, somme))
 		}
 	}
 
@@ -166,6 +173,37 @@ func contours(img image.Image, puissance int) image.Image { //filtre laplacien :
 	return negatifNB(imgCont) //applique le filtre négatif pour que ça soit "plus joli"
 }
 
+func contoursPrewitt(img image.Image, puissance int) image.Image { //filtre prewitt
+	imgCont0 := image.NewRGBA(img.Bounds())
+	imgCont90 := image.NewRGBA(img.Bounds())
+	imgRes := image.NewRGBA(img.Bounds())
+
+	coeff1 := [3][3]float64{{-1, -1, -1}, {-1, 8, -1}, {-1, -1, -1}} //Prewitt 0°
+	coeff2 := [3][3]float64{{-2, -2, 0}, {-2, 0, 2}, {0, 2, 2}}      //Prewitt 90°
+
+	somme := float64(puissance) //pose problème entre nv détails , et efficacité ==> eventuellement le proposer en réglage à l'utilisateur
+	for y := img.Bounds().Min.Y + 1; y < img.Bounds().Max.Y-1; y++ {
+		for x := img.Bounds().Min.X + 1; x < img.Bounds().Max.X-1; x++ {
+			imgCont0.Set(x, y, convolution(x, y, img, coeff1, somme))
+		}
+	}
+
+	for y := img.Bounds().Min.Y + 1; y < img.Bounds().Max.Y-1; y++ {
+		for x := img.Bounds().Min.X + 1; x < img.Bounds().Max.X-1; x++ {
+			imgCont90.Set(x, y, convolution(x, y, img, coeff2, somme))
+		}
+	}
+
+	for y := img.Bounds().Min.Y + 1; y < img.Bounds().Max.Y-1; y++ {
+		for x := img.Bounds().Min.X + 1; x < img.Bounds().Max.X-1; x++ {
+			pix := uint8(math.Sqrt(math.Pow(float64(imgCont0.RGBAAt(x, y).R), 2) + math.Pow(float64(imgCont90.RGBAAt(x, y).R), 2)))
+			imgRes.Set(x, y, color.Gray{Y: pix})
+		}
+	}
+
+	return negatifNB(imgRes) //applique le filtre négatif pour que ça soit "plus joli"
+}
+
 func nettete(img image.Image) image.Image { //pb à voir fait de la merde, n'est pas référencé dans le dispatch
 	imgNet := image.NewRGBA(img.Bounds())
 	coeff := [3][3]float64{{0, -1, 0}, {-1, 5, -1}, {0, -1, 0}}
@@ -195,7 +233,7 @@ func separation(img image.Image) (image.Image, image.Image, image.Image) { //ser
 	return imgR, imgV, imgB
 }
 
-func despeckleNB(img image.Image, x int, y int, n int) color.RGBA {
+func despeckleNB(img image.Image, x int, y int, n int, coeffGauss [][]float64, sommeGauss float64) color.Gray { //réduction de bruit Noir et Blanc : fonctionnel
 	var moyenne, stdev float64
 	moyenne, stdev = 0, 0
 
@@ -227,16 +265,17 @@ func despeckleNB(img image.Image, x int, y int, n int) color.RGBA {
 	t, _, _, _ := img.At(x, y).RGBA()
 
 	if float64(t) <= moyenne-stdev || float64(t) >= moyenne+stdev {
-		t = uint32(convolutionGauss(x, y, img, 3).R) //on prend la composante rouge ici mais peu importe vu qu'on est en niveaux de gris
+
+		t = uint32(convolutionGauss(x, y, img, 3, coeffGauss, sommeGauss).R) //on prend la composante rouge ici mais peu importe vu qu'on est en niveaux de gris
 	}
 
-	pix := color.RGBA{R: uint8(t), G: uint8(t), B: uint8(t), A: 0xff} //on reconstruit le pixel modifié
+	pix := color.Gray{Y: uint8(t)} //on reconstruit le pixel modifié
 	return pix
 
 }
 
 //MARCHE PAS en couleurs
-func despeckleRVB(img image.Image, x int, y int, n int) color.RGBA { //déparasitage de chaque composante, n taille matrice
+func despeckleRVB(img image.Image, x int, y int, n int, coeffGauss [][]float64, sommeGauss float64) color.RGBA { //déparasitage de chaque composante, n taille matrice
 	var moyenneR, moyenneV, moyenneB float64
 	moyenneB, moyenneR, moyenneV = 0, 0, 0
 
@@ -275,13 +314,13 @@ func despeckleRVB(img image.Image, x int, y int, n int) color.RGBA { //déparasi
 	r, v, b, _ := img.At(x, y).RGBA()
 
 	if float64(r) <= moyenneR-stdevR || float64(r) >= moyenneR+stdevR {
-		r = uint32(convolutionGauss(x, y, img, 3).R)
+		r = uint32(convolutionGauss(x, y, img, 3, coeffGauss, sommeGauss).R)
 	}
 	if float64(v) <= moyenneV-stdevV || float64(v) >= moyenneV+stdevV {
-		v = uint32(convolutionGauss(x, y, img, 3).G)
+		v = uint32(convolutionGauss(x, y, img, 3, coeffGauss, sommeGauss).G)
 	}
 	if float64(b) <= moyenneB-stdevB || float64(b) >= moyenneR+stdevB {
-		b = uint32(convolutionGauss(x, y, img, 3).B)
+		b = uint32(convolutionGauss(x, y, img, 3, coeffGauss, sommeGauss).B)
 	}
 
 	pix := color.RGBA{R: uint8(r), G: uint8(v), B: uint8(b), A: 0xff} //on reconstruit le pixel modifié
@@ -289,18 +328,19 @@ func despeckleRVB(img image.Image, x int, y int, n int) color.RGBA { //déparasi
 }
 
 func debruitageNB(img image.Image, nbIterations int, n int) image.Image {
-	imgDebruit := image.NewRGBA(img.Bounds())
+	imgDebruit := image.NewGray(img.Bounds())
+	coeffGauss, sommeGauss := calculGauss(3)
 
 	for y := img.Bounds().Min.Y + n/2; y < img.Bounds().Max.Y-n/2; y++ {
 		for x := img.Bounds().Min.X + n/2; x < img.Bounds().Max.X-n/2; x++ {
-			imgDebruit.Set(x, y, despeckleNB(img, x, y, n))
+			imgDebruit.Set(x, y, despeckleNB(img, x, y, n, coeffGauss, sommeGauss))
 		}
 	}
 
 	for k := 0; k < nbIterations-1; k++ {
 		for y := img.Bounds().Min.Y + n/2; y < img.Bounds().Max.Y-n/2; y++ {
 			for x := img.Bounds().Min.X + n/2; x < img.Bounds().Max.X-n/2; x++ {
-				imgDebruit.Set(x, y, despeckleNB(imgDebruit, x, y, n))
+				imgDebruit.Set(x, y, despeckleNB(imgDebruit, x, y, n, coeffGauss, sommeGauss))
 			}
 		}
 	}
@@ -310,17 +350,18 @@ func debruitageNB(img image.Image, nbIterations int, n int) image.Image {
 
 func debruitageRVB(img image.Image, nbIterations int, n int) image.Image { //ne marche pas bien, n'est pas référencé dans le dispatch
 	imgDebruit := image.NewRGBA(img.Bounds())
+	coeffGauss, sommeGauss := calculGauss(3)
 
 	for y := img.Bounds().Min.Y + n/2; y < img.Bounds().Max.Y-n/2; y++ {
 		for x := img.Bounds().Min.X + n/2; x < img.Bounds().Max.X-n/2; x++ {
-			imgDebruit.Set(x, y, despeckleRVB(img, x, y, n))
+			imgDebruit.Set(x, y, despeckleRVB(img, x, y, n, coeffGauss, sommeGauss))
 		}
 	}
 
 	for k := 0; k < nbIterations-1; k++ {
 		for y := img.Bounds().Min.Y + n/2; y < img.Bounds().Max.Y-n/2; y++ {
 			for x := img.Bounds().Min.X + n/2; x < img.Bounds().Max.X-n/2; x++ {
-				imgDebruit.Set(x, y, despeckleRVB(imgDebruit, x, y, n))
+				imgDebruit.Set(x, y, despeckleRVB(imgDebruit, x, y, n, coeffGauss, sommeGauss))
 			}
 		}
 	}
@@ -362,11 +403,17 @@ func dispatch(img image.Image, n int, param1 int, param2 int) image.Image { //pe
 	case 7:
 		res = contours(img, param1) //param1 = puissance de séparation en paramètre 8 voire 16, plus c'est élevé plus seuls les "gros" contours seront visibles
 		break
+
+	case 8:
+		res = contoursPrewitt(img, param1) //pareil que contours mais utilise le filtre de Prewitt à la place
+		break
+
 	}
+
 	return res
 }
 
 func main() {
 	imageTest := importImage()
-	ecritureFichier(debruitageRVB(imageTest, 2, 7))
+	ecritureFichier(debruitageRVB(imageTest, 3, 7))
 }
