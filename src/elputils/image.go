@@ -1,4 +1,4 @@
-package main
+package elputils
 
 import (
 	"fmt"
@@ -11,9 +11,9 @@ import (
 )
 
 func ecritureFichier(image2 image.Image) {
-	output, err := os.Create("img_modif.png") //création du fichier image de sortie
+	output, err := os.Create("img_modif.png") //création du fichier image_utils de sortie
 
-	err = png.Encode(output, image2) //écriture de l'image
+	err = png.Encode(output, image2) //écriture de l'image_utils
 	err = output.Close()
 	if err != nil {
 		fmt.Println("Erreur dans la création du fichier!")
@@ -25,7 +25,7 @@ func importImage() image.Image {
 	img, err := jpeg.Decode(input)
 
 	if err != nil {
-		fmt.Println("Erreur dans l'importation de l'image!")
+		fmt.Println("Erreur dans l'importation de l'image_utils!")
 	}
 
 	return img
@@ -49,7 +49,7 @@ func niveauGris(img image.Image) image.Image {
 	return imgGris
 }
 
-func negatifNB(img image.Image) image.Image { //image négatif en noir en blanc
+func negatifNB(img image.Image) image.Image { //image_utils négatif en noir en blanc
 	imgGris := niveauGris(img)
 	imgNeg := image.NewGray(img.Bounds())
 	for y := img.Bounds().Min.Y; y < img.Bounds().Max.Y; y++ {
@@ -217,7 +217,7 @@ func nettete(img image.Image) image.Image { //pb à voir fait de la merde, n'est
 	return imgNet
 }
 
-func separation(img image.Image) (image.Image, image.Image, image.Image) { //sert à séparer les 3 composantes de l'image, pas très utile
+func separation(img image.Image) (image.Image, image.Image, image.Image) { //sert à séparer les 3 composantes de l'image_utils, pas très utile
 	imgR := image.NewRGBA(img.Bounds())
 	imgV := image.NewRGBA(img.Bounds())
 	imgB := image.NewRGBA(img.Bounds())

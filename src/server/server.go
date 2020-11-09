@@ -1,28 +1,34 @@
 package main
 
 import (
-	utils "server/server_utils"
+	"ELP-GO/src/elputils"
 	"fmt"
 	"net"
 	"os"
 )
 
 func main() {
-	// numéro de port établi au préalable
-	// TODO : pouvoir le changer via un paramètre argc
-	const PORT string = "8080"
 
-	// le processus actuel sera dédié à l'écoute des échanges TCP sur le port PORT
+	// Get port from argc, or use default value 8080
+	var PORT string
+	if len(os.Args) == 2 {
+		PORT = os.Args[1]
+	} else {
+		PORT = "8080"
+	}
+
+	// Listen on TCP port PORT
 	ln, err := net.Listen("tcp", ":"+PORT)
 
 	if err != nil {
-		fmt.Println("Couldn't listen on " + PORT + ". Is this port already in use ?")
+		fmt.Printf("Couldn't listen on port %d. This port may already be in use\n", PORT)
 		return
 	}
+
 	fmt.Println("Server TCP created on port " + PORT)
 
-	// Connection number, to identify unique connection
-	conn_id := 1
+	// Connection number, to identify unique connections
+	conn_id := 0
 
 	// Infinite loop for TCP message handling
 	for {
@@ -31,48 +37,48 @@ func main() {
 			// handle error
 			fmt.Printf("Couldn't accept connection %v\n", conn_id)
 		}
-		// goroutine to handle connection
+		// Goroutine to handle connection
 		go handleConnection(conn, conn_id)
 
-		conn_id += 1
+		// Increase id for next connection
+		conn_id++
 	}
 }
 
-func handleConnection(c net.Conn, numconn int) {
-	fmt.Println("New connection with a client")
+// Handles a new connection initiated with a client
+// Client must send a filter id, a filename and a image blob
+func handleConnection(connection net.Conn, conn_id int) {
+	fmt.Printf("New connection with a client, id %d\n", conn_id)
 
-	// envoi des possibilités de filtres
-	liste_filtres := "1. Noir et blanc \n2. Autre filtre"
-	utils.SendString(c, liste_filtres+"\t")
+	// Send available filters
+	liste_filtres := "1. Black & White \n2. Something else"
+	elputils.SendString(connection, liste_filtres+"\t")
 
-	// réception du filtre, vérification de la validité et renvoi d'un caractère (1: choix valide, 0: choix invalide)
-	// si 1, passage au point suivant
-	utils.ValideFiltre(c)
+	// Receive filter and send back "1" when valid, "0" otherwise
+	elputils.ValideFiltre(connection)
 
-	// réception nom image
+	// Receive modified image name
 	fmt.Println("Nom image")
-	fileName := utils.ReceiveString(c)
-	fmt.Println(fileName)
+	fileName := elputils.ReceiveString(connection, '\n')
+	fmt.Printf("Target image %s\n", fileName)
 
-	// attente de réception de l'image
-	fmt.Println("Réception de l'image")
-	utils.ReceiveFile(c)
+	// Receive image blob
+	fmt.Println("Receiving image...")
+	elputils.ReceiveFile(connection)
 
-	// appliquer le filtre
-	fmt.Println("Application du filtre")
-	fileModified := utils.NewName(fileName)
+	// Apply filter
+	fmt.Println("Applying filter")
+	fileModified := elputils.NewName(fileName)
 
-	// rename the file
-	fmt.Println("Rename the file")
+	// Rename & send the file
+	fmt.Println("Sending back %s", fileName)
 	os.Rename(fileName, fileModified)
+	elputils.UploadFile(connection, fileModified)
 
-	// renvoyer le fichier avec le nom modifié
-	utils.UploadFile(c, fileModified)
+	// Close connection
+	fmt.Printf("Closing connection with client %d\n", conn_id)
+	connection.Close()
 
-	// fermer la connection
-	c.Close()
-	fmt.Println("Goodbye", numconn)
-
-	// supprimer le fichier d'image
-	utils.DeleteFile(fileModified)
+	// Delete temp file
+	elputils.DeleteFile(fileModified)
 }

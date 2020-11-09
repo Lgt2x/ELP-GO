@@ -1,4 +1,4 @@
-package client_utils
+package elputils
 
 import (
 	"bufio"
@@ -6,7 +6,6 @@ import (
 	"io"
 	"net"
 	"os"
-	"path/filepath"
 	"strconv"
 	"strings"
 )
@@ -18,45 +17,12 @@ func SendString(conn net.Conn, chaine string) {
 	io.WriteString(conn, fmt.Sprint(chaine))
 }
 
-func InputString() string {
-	reader := bufio.NewReader(os.Stdin)
-	fmt.Print("> ")
-	filtre, err := reader.ReadString('\n')
+func ReceiveString(conn net.Conn, delimiter byte) string {
+	message, err := bufio.NewReader(conn).ReadString(delimiter)
 	if err != nil {
 		panic(err)
 	}
-	return filtre
-}
-
-func InputFilter(conn net.Conn) {
-	filtre := InputString()
-	SendString(conn, filtre)
-
-	validationServer := ReceiveString(conn, '\n')
-	filtre_valide := strings.Compare(validationServer[0:1], "1")
-
-	if filtre_valide != 0 {
-		fmt.Println("Saisie invalide")
-		InputFilter(conn)
-	}
-}
-
-func InputImagePath() (string, string) {
-	fmt.Print("Saisie du chemin de l'image (relatif): ")
-	image_path := InputString()
-	image_path_abs, _ := filepath.Abs(image_path[:len(image_path)-1])
-
-	if FileExists(image_path_abs) {
-		return image_path[:len(image_path)-1], image_path_abs
-	}
-	return InputImagePath()
-}
-
-func FileExists(filepath string) bool {
-	if _, err := os.Stat(filepath); err == nil {
-		return true
-	}
-	return false
+	return message
 }
 
 func UploadFile(conn net.Conn, srcFile string) {
@@ -85,22 +51,9 @@ func UploadFile(conn net.Conn, srcFile string) {
 		}
 
 		conn.Write(sendBuffer)
-
 	}
 	fmt.Println("File has been sent")
 	return
-}
-
-func FillString(retunString string, toLength int) string {
-	for {
-		lengtString := len(retunString)
-		if lengtString < toLength {
-			retunString = retunString + ":"
-			continue
-		}
-		break
-	}
-	return retunString
 }
 
 func ReceiveFile(conn net.Conn) {
@@ -124,7 +77,7 @@ func ReceiveFile(conn net.Conn) {
 	fmt.Println("Start receiving")
 	for {
 		if (fileSize - receivedBytes) < BUFFERSIZE {
-			io.CopyN(newFile, conn, (fileSize - receivedBytes))
+			io.CopyN(newFile, conn, fileSize-receivedBytes)
 			conn.Read(make([]byte, (receivedBytes+BUFFERSIZE)-fileSize))
 			break
 		}
@@ -132,12 +85,4 @@ func ReceiveFile(conn net.Conn) {
 		receivedBytes += BUFFERSIZE
 	}
 	fmt.Println("Received file completely!")
-}
-
-func ReceiveString(conn net.Conn, delimiter byte) string {
-	message, err := bufio.NewReader(conn).ReadString(delimiter)
-	if err != nil {
-		panic(err)
-	}
-	return message
 }

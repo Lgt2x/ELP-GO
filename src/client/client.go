@@ -1,57 +1,58 @@
 package main
 
 import (
-	utils "client/client_utils"
+	"ELP-GO/src/elputils"
 	"fmt"
 	"net"
 	"os"
 )
 
-const BUFFERSIZE = 1024
-
 func main() {
-	// numéro de port établi au préalable
-	PORT := "8080"
+	// Get port from argc, or use default value 8080
+	var PORT string
+	if len(os.Args) == 2 {
+		PORT = os.Args[1]
+	} else {
+		PORT = "8080"
+	}
 
-	// connexion au serveur
+	// Connecting to the server on port PORT
+	fmt.Printf("Connecting to server on port %s. You can change the port used by specifying it as an argc value eg 'client 5000'\n", PORT)
 	conn, err := net.Dial("tcp", "localhost:"+PORT)
 
 	if err != nil {
-		fmt.Println("Couldn't connect to server")
+		fmt.Printf("Couldn't listen on port %s. Is the server running ?\n", PORT)
 		return
 	}
 
+	// Connection successful, close the connection when it's over
+	fmt.Printf("Connection established with server on port %s\n", PORT)
 	defer conn.Close()
 
-	// attendre réception liste filtres serveurs
-	listeFilters := utils.ReceiveString(conn, '\t')
+	// Get filter list
+	listeFilters := elputils.ReceiveString(conn, '\t')
 	fmt.Println(listeFilters)
 
-	// saisie du filtre
-	utils.InputFilter(conn)
+	// Input filter
+	elputils.InputFilter(conn)
 
-	// affichage chemin
+	// Print current directory
 	dir, err := os.Getwd()
 	fmt.Println(dir)
 
-	// saisie nom fichier image + validation (exist or not)
-	image_path, image_path_abs := utils.InputImagePath()
+	// Input image filename
+	imagePath, imagePathAbs := elputils.InputImagePath()
 
-	// envoi nom image on envoie le chemin relatif car on est en local + soucis de creation
-	fmt.Println("Envoi du nom de l'image")
-	utils.SendString(conn, image_path+"\n")
+	// Send image filename to the server
+	fmt.Println("Sending filename")
+	elputils.SendString(conn, imagePath+"\n")
 
-	// envoi de l'image
-	// time.Sleep(1 * time.Second)
-	fmt.Println("Envoi de l'image:", image_path_abs)
-	utils.UploadFile(conn, image_path)
-	//time.Sleep(1 * time.Second)
+	// Send file
+	fmt.Println("Sending image", imagePathAbs)
+	elputils.UploadFile(conn, imagePath)
 
-	// attente réception nom image modifiée
-	fmt.Println("Attente réception nom de l'image modifiée")
-	//filename_modified := receiveString(conn, '\n')
-	//fmt.Println(filename_modified)
-
-	//utils.ReceiveFile(conn, image_path[:len(image_path)-4]+"_modified.txt")
-	utils.ReceiveFile(conn)
+	// Receiving the modified image
+	fmt.Println("Waiting for the modified image...")
+	elputils.ReceiveFile(conn)
+	fmt.Println("Received modified image !")
 }
