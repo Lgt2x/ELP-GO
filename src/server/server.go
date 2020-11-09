@@ -50,12 +50,13 @@ func main() {
 func handleConnection(connection net.Conn, conn_id int) {
 	fmt.Printf("New connection with a client, id %d\n", conn_id)
 
-	// Send available filters
-	liste_filtres := "1. Black & White \n2. Something else"
-	elputils.SendString(connection, liste_filtres+"\t")
+	// Send available filters as an array
+	filterList := []string{"Black & white", "Invert color"}
+	fmt.Println("Sending filter list to the client")
+	elputils.SendArray(connection, filterList)
 
 	// Receive filter and send back "1" when valid, "0" otherwise
-	elputils.ValideFiltre(connection)
+	elputils.ReceiveFilter(connection)
 
 	// Receive modified image name
 	fmt.Println("Nom image")

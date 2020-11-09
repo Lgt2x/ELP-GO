@@ -1,3 +1,5 @@
+// Utility functions for user input processing
+// used for both client and server
 package elputils
 
 import (
@@ -6,69 +8,89 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 )
 
-// Input a string from stdin
+// Input a string from stdin and handle errors
 func InputString() string {
 	reader := bufio.NewReader(os.Stdin)
 	fmt.Print("> ")
-	filtre, err := reader.ReadString('\n')
+	filter, err := reader.ReadString('\n')
 	if err != nil {
 		panic(err)
 	}
-	return filtre
+	return filter
 }
 
-func InputFilter(conn net.Conn) {
+// Input filter, client-side
+// Tries again until it succeeds
+func InputFilter(conn net.Conn, filterList []string) {
+	// Display available choices
+	fmt.Println("Available filters :")
+	for i := 0; i < len(filterList); i++ {
+		fmt.Printf("%d. : %s\n", i+1, filterList[i])
+	}
+	fmt.Print("Enter a valid filter id")
 	filter := InputString()
-	SendString(conn, filter)
 
+	// Send and validate filter id
+	SendString(conn, filter)
 	validationServer := ReceiveString(conn, '\n')
+	fmt.Println(validationServer)
 	filtre_valide := strings.Compare(validationServer[0:1], "1")
 
 	if filtre_valide != 0 {
-		fmt.Println("Saisie invalide")
-		InputFilter(conn)
+		fmt.Println("Invalid choice")
+		// Try again if invalid
+		InputFilter(conn, filterList)
 	}
 }
 
+// Receive and process filter choice, server-side
+func ReceiveFilter(conn net.Conn) {
+	filterValidated := false
+	for filterValidated != true {
+		filterStr := ReceiveString(conn, '\n')
+		filter, err := strconv.Atoi(strings.Trim(filterStr, "\n"))
+
+		if err != nil {
+			panic(err)
+		}
+
+		fmt.Println(filter)
+
+		if filter <= 2 {
+			fmt.Printf("Received filter : %s\n", filterStr)
+			SendString(conn, "1\n")
+			filterValidated = true
+		} else {
+			fmt.Printf("Invalid filter : %s\n", filterStr)
+			SendString(conn, "1\n")
+		}
+	}
+}
+
+// Inputs an image path
 func InputImagePath() (string, string) {
-	fmt.Print("Saisie du chemin de l'image_utils (relatif): ")
+	fmt.Print("Relative path to the image : ")
 	imagePath := InputString()
 	imagePathAbs, _ := filepath.Abs(imagePath[:len(imagePath)-1])
 
 	if FileExists(imagePathAbs) {
 		return imagePath[:len(imagePath)-1], imagePathAbs
 	}
+	// To it again if it fails
+	fmt.Print("File not found")
 	return InputImagePath()
 }
 
+// Check if a file exists in the current directory
 func FileExists(filepath string) bool {
 	if _, err := os.Stat(filepath); err == nil {
 		return true
 	}
 	return false
-}
-
-func ValideFiltre(c net.Conn) {
-	validationFiltre := false
-	for validationFiltre != true {
-		choixFiltre := ReceiveString(c, '\n')
-		fmt.Println(choixFiltre)
-
-		switch choixFiltre {
-		// enumeration des choix valides
-		case "1":
-			// validation et go pour machin truc
-			fmt.Println("Choix valide")
-			validationFiltre = true
-			SendString(c, "1\n")
-		default:
-			fmt.Println("Choix invalide")
-			SendString(c, "0\n")
-		}
-	}
 }
 
 func FillString(retunString string, toLength int) string {
@@ -89,8 +111,8 @@ func NewName(filename string) string {
 	return filename[:indexExt] + "_modified" + filename[indexExt:]
 }
 
+// Delete the file filename
 func DeleteFile(filename string) {
-	// delete the file filename
 	err := os.Remove(filename)
 	if err != nil {
 		fmt.Println("Suppression impossible")

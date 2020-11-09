@@ -29,12 +29,9 @@ func main() {
 	fmt.Printf("Connection established with server on port %s\n", PORT)
 	defer conn.Close()
 
-	// Get filter list
-	listeFilters := elputils.ReceiveString(conn, '\t')
-	fmt.Println(listeFilters)
-
 	// Input filter
-	elputils.InputFilter(conn)
+	filter_list := elputils.ReceiveArray(conn, ";", '\n')
+	elputils.InputFilter(conn, filter_list)
 
 	// Print current directory
 	dir, err := os.Getwd()
