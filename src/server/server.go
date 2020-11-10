@@ -51,29 +51,22 @@ func main() {
 }
 
 // Handles a new connection initiated with a client
-// Client must send a filter id, a filename and a image blob
+// Client must send a filter id and a image blob
 func handleConnection(connection net.Conn, connId int) {
 	fmt.Printf("New connection with a client, id %d\n", connId)
 
-	// Send available filters as an array
+	// Send available filters as contatenated array
 	filterList := []string{"Black & white", "Invert color"}
 	fmt.Println("Sending filter list to the client")
 	elputils.SendArray(connection, filterList)
 
-	// Receive filter and send back "1" when valid, "0" otherwise
+	// Receive filter and send back 1 or 0 wether it's valid or not
 	elputils.ReceiveFilter(connection)
-
-	// Receive modified image name
-	fmt.Println("Nom image")
-	fileName := elputils.ReceiveString(connection, '\n')
-	fmt.Printf("Target image %s\n", fileName)
 
 	// Receive image blob and store it in a temp file
 	fmt.Println("Receiving image...")
 	og_name := "tmp/og_" + strconv.Itoa(connId) + ".jpg"
 	modif_name := "tmp/modif_" + strconv.Itoa(connId) + ".jpg"
-	fmt.Println(og_name)
-	fmt.Println(modif_name)
 	elputils.ReceiveFile(connection, og_name)
 
 	// Apply filter
@@ -83,11 +76,11 @@ func handleConnection(connection net.Conn, connId int) {
 	//fileModified := "img_modif.jpg"
 
 	// Send back the file
-	fmt.Printf("Sending back %s\n", fileName)
+	fmt.Printf("Sending back the modified image\n")
 	elputils.UploadFile(connection, modif_name)
 
 	// Close connection
-	fmt.Printf("Closing connection with client %d\n", connId)
+	fmt.Printf("Closing connection with client %d\n\n", connId)
 	connection.Close()
 
 	// Delete temp files

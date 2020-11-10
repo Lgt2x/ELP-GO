@@ -46,7 +46,7 @@ func ReceiveArray(conn net.Conn, delimiter string, delimEnd byte) []string {
 	if err != nil {
 		panic(err)
 	}
-	return strings.Split(message, delimiter)
+	return strings.Split(strings.Trim(message, "\n"), delimiter)
 }
 
 // Send a file specified a filename
@@ -63,22 +63,18 @@ func UploadFile(conn net.Conn, srcFile string) {
 	}
 	fileSize := FillString(strconv.FormatInt(fileInfo.Size(), 10), 10)
 	fileName := FillString(fileInfo.Name(), 64)
-	fmt.Printf("Sending filename %s and filesize!\n", fileName)
+
 	_, _ = conn.Write([]byte(fileSize))
 	_, _ = conn.Write([]byte(fileName))
 	sendBuffer := make([]byte, BUFFERSIZE)
-	fmt.Println("Start sending file!")
 	for {
 		_, err = file.Read(sendBuffer)
-
 		if err == io.EOF {
 			break
 		}
 
 		_, _ = conn.Write(sendBuffer)
 	}
-	fmt.Println("File has been sent")
-	return
 }
 
 // Receive a file and copy it to specificed location
@@ -102,7 +98,6 @@ func ReceiveFile(conn net.Conn, destination string) {
 	fmt.Println("Start receiving")
 	for {
 		if (fileSize - receivedBytes) < BUFFERSIZE {
-			fmt.Println(fileSize, receivedBytes)
 			_, _ = io.CopyN(newFile, conn, fileSize-receivedBytes)
 			_, _ = conn.Read(make([]byte, (receivedBytes+BUFFERSIZE)-fileSize))
 			break

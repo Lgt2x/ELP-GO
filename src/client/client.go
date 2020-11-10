@@ -32,29 +32,22 @@ func main() {
 
 	// Input filter
 	filterList := elputils.ReceiveArray(conn, ";", '\n')
-	elputils.InputFilter(conn, filterList)
-
-	// Print current directory
-	dir, err := os.Getwd()
-	fmt.Println(dir)
+	filterNum := elputils.InputFilter(conn, filterList)
+	fmt.Printf("Selected filter '%s'\n", filterList[filterNum])
 
 	// Input image filename
-	imagePath, imagePathAbs := elputils.InputImagePath()
+	imagePath := elputils.InputImagePath()
 
 	// Input output file
-	fmt.Println("Enter the output file name")
+	fmt.Print("Enter the output file name ")
 	outputFile := strings.Trim(elputils.InputString(), "\n")
 
-	// Send image filename to the server
-	fmt.Println("Sending filename")
-	elputils.SendString(conn, imagePath+"\n")
-
 	// Send file
-	fmt.Println("Sending image", imagePathAbs)
+	fmt.Println("Sending image", imagePath)
 	elputils.UploadFile(conn, imagePath)
 
 	// Receiving the modified image
-	fmt.Println("Waiting for the modified image...")
+	fmt.Println("\nWaiting for the modified image...")
 	elputils.ReceiveFile(conn, outputFile)
-	fmt.Println("Transformation complete, output in ", outputFile)
+	fmt.Println("Transformation complete, output stored in ", outputFile)
 }

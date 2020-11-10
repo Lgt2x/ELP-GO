@@ -25,19 +25,18 @@ func InputString() string {
 
 // Input filter, client-side
 // Tries again until it succeeds
-func InputFilter(conn net.Conn, filterList []string) {
+func InputFilter(conn net.Conn, filterList []string) int {
 	// Display available choices
 	fmt.Println("Available filters :")
 	for i := 0; i < len(filterList); i++ {
 		fmt.Printf("%d. : %s\n", i+1, filterList[i])
 	}
-	fmt.Print("Enter a valid filter id")
+	fmt.Print("Enter a valid filter id ")
 	filter := InputString()
 
 	// Send and validate filter id
 	SendString(conn, filter)
 	validationServer := ReceiveString(conn, '\n')
-	fmt.Println(validationServer)
 	filtre_valide := strings.Compare(validationServer[0:1], "1")
 
 	if filtre_valide != 0 {
@@ -45,20 +44,19 @@ func InputFilter(conn net.Conn, filterList []string) {
 		// Try again if invalid
 		InputFilter(conn, filterList)
 	}
+	num, _ := strconv.Atoi(strings.Trim(filter, "\n"))
+	return num
 }
 
 // Receive and process filter choice, server-side
 func ReceiveFilter(conn net.Conn) {
 	filterValidated := false
 	for filterValidated != true {
-		filterStr := ReceiveString(conn, '\n')
-		filter, err := strconv.Atoi(strings.Trim(filterStr, "\n"))
-
+		filterStr := strings.Trim(ReceiveString(conn, '\n'), "\n")
+		filter, err := strconv.Atoi(filterStr)
 		if err != nil {
 			panic(err)
 		}
-
-		fmt.Println(filter)
 
 		if filter <= 2 {
 			fmt.Printf("Received filter : %s\n", filterStr)
@@ -72,13 +70,13 @@ func ReceiveFilter(conn net.Conn) {
 }
 
 // Inputs an image path
-func InputImagePath() (string, string) {
-	fmt.Print("Relative path to the image : ")
-	imagePath := InputString()
-	imagePathAbs, _ := filepath.Abs(imagePath[:len(imagePath)-1])
+func InputImagePath() string {
+	fmt.Print("Relative path to the image ")
+	imagePath := strings.Trim(InputString(), "\n")
+	imagePathAbs, _ := filepath.Abs(imagePath)
 
 	if FileExists(imagePathAbs) {
-		return imagePath[:len(imagePath)-1], imagePathAbs
+		return imagePath
 	}
 	// To it again if it fails
 	fmt.Print("File not found")
