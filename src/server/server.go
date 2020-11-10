@@ -21,34 +21,34 @@ func main() {
 	ln, err := net.Listen("tcp", ":"+PORT)
 
 	if err != nil {
-		fmt.Printf("Couldn't listen on port %d. This port may already be in use\n", PORT)
+		fmt.Printf("Couldn't listen on port %s. This port may already be in use\n", PORT)
 		return
 	}
 
 	fmt.Println("Server TCP created on port " + PORT)
 
 	// Connection number, to identify unique connections
-	conn_id := 0
+	connId := 0
 
 	// Infinite loop for TCP message handling
 	for {
 		conn, err := ln.Accept()
 		if err != nil {
 			// handle error
-			fmt.Printf("Couldn't accept connection %v\n", conn_id)
+			fmt.Printf("Couldn't accept connection %v\n", connId)
 		}
 		// Goroutine to handle connection
-		go handleConnection(conn, conn_id)
+		go handleConnection(conn, connId)
 
 		// Increase id for next connection
-		conn_id++
+		connId++
 	}
 }
 
 // Handles a new connection initiated with a client
 // Client must send a filter id, a filename and a image blob
-func handleConnection(connection net.Conn, conn_id int) {
-	fmt.Printf("New connection with a client, id %d\n", conn_id)
+func handleConnection(connection net.Conn, connId int) {
+	fmt.Printf("New connection with a client, id %d\n", connId)
 
 	// Send available filters as an array
 	filterList := []string{"Black & white", "Invert color"}
@@ -65,21 +65,25 @@ func handleConnection(connection net.Conn, conn_id int) {
 
 	// Receive image blob
 	fmt.Println("Receiving image...")
-	elputils.ReceiveFile(connection)
-
+	name := elputils.ReceiveFile(connection, "serv_rec.jpg")
+	fmt.Println(name)
 	// Apply filter
 	fmt.Println("Applying filter")
-	fileModified := elputils.NewName(fileName)
+
+	imageTest := elputils.ImportImage("serv_rec.jpg")
+	elputils.WriteToFile(elputils.NegativeRGB(imageTest))
+	//fileModified := "img_modif.jpg"
 
 	// Rename & send the file
-	fmt.Println("Sending back %s", fileName)
-	os.Rename(fileName, fileModified)
-	elputils.UploadFile(connection, fileModified)
+	fmt.Printf("Sending back %s\n", fileName)
+
+	elputils.UploadFile(connection, "img_modif.jpg")
 
 	// Close connection
-	fmt.Printf("Closing connection with client %d\n", conn_id)
+	fmt.Printf("Closing connection with client %d\n", connId)
 	connection.Close()
 
-	// Delete temp file
-	elputils.DeleteFile(fileModified)
+	// Delete temp files
+	elputils.DeleteFile("img_modif.jpg")
+	//elputils.DeleteFile("serv_rec.jpg")
 }

@@ -30,8 +30,8 @@ func main() {
 	defer conn.Close()
 
 	// Input filter
-	filter_list := elputils.ReceiveArray(conn, ";", '\n')
-	elputils.InputFilter(conn, filter_list)
+	filterList := elputils.ReceiveArray(conn, ";", '\n')
+	elputils.InputFilter(conn, filterList)
 
 	// Print current directory
 	dir, err := os.Getwd()
@@ -50,6 +50,6 @@ func main() {
 
 	// Receiving the modified image
 	fmt.Println("Waiting for the modified image...")
-	elputils.ReceiveFile(conn)
+	elputils.ReceiveFile(conn, "client_modif.jpg")
 	fmt.Println("Received modified image !")
 }

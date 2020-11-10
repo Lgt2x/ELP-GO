@@ -17,7 +17,10 @@ const BUFFERSIZE = 1024
 // Send a string using the specified connection object
 func SendString(conn net.Conn, chaine string) {
 	// send the string chaine
-	io.WriteString(conn, fmt.Sprint(chaine))
+	_, err := io.WriteString(conn, fmt.Sprint(chaine))
+	if err != nil {
+		panic(err)
+	}
 }
 
 // Receive a string
@@ -31,7 +34,10 @@ func ReceiveString(conn net.Conn, delimiter byte) string {
 
 // Send an array of strings using a semi-colon as a separator
 func SendArray(conn net.Conn, array []string) {
-	io.WriteString(conn, fmt.Sprint(strings.Join(array, ";")+"\n"))
+	_, err := io.WriteString(conn, fmt.Sprint(strings.Join(array, ";")+"\n"))
+	if err != nil {
+		panic(err)
+	}
 }
 
 // Receive an array of strings
@@ -57,9 +63,9 @@ func UploadFile(conn net.Conn, srcFile string) {
 	}
 	fileSize := FillString(strconv.FormatInt(fileInfo.Size(), 10), 10)
 	fileName := FillString(fileInfo.Name(), 64)
-	fmt.Println("Sending filename and filesize!")
-	conn.Write([]byte(fileSize))
-	conn.Write([]byte(fileName))
+	fmt.Printf("Sending filename %s and filesize!\n", fileName)
+	_, _ = conn.Write([]byte(fileSize))
+	_, _ = conn.Write([]byte(fileName))
 	sendBuffer := make([]byte, BUFFERSIZE)
 	fmt.Println("Start sending file!")
 	for {
@@ -69,24 +75,23 @@ func UploadFile(conn net.Conn, srcFile string) {
 			break
 		}
 
-		conn.Write(sendBuffer)
+		_, _ = conn.Write(sendBuffer)
 	}
 	fmt.Println("File has been sent")
 	return
 }
 
 // Receive a file and copy it to current directory
-func ReceiveFile(conn net.Conn) {
+func ReceiveFile(conn net.Conn, destination string) string {
 	bufferFileName := make([]byte, 64)
 	bufferFileSize := make([]byte, 10)
 
-	conn.Read(bufferFileSize)
+	_, _ = conn.Read(bufferFileSize)
 	fileSize, _ := strconv.ParseInt(strings.Trim(string(bufferFileSize), ":"), 10, 64)
 
-	conn.Read(bufferFileName)
+	_, _ = conn.Read(bufferFileName)
 	fileName := strings.Trim(string(bufferFileName), ":")
-
-	newFile, err := os.Create(fileName)
+	newFile, err := os.Create(destination)
 
 	if err != nil {
 		panic(err)
@@ -96,14 +101,16 @@ func ReceiveFile(conn net.Conn) {
 
 	fmt.Println("Start receiving")
 	for {
-		fmt.Println("receive 1 byte")
 		if (fileSize - receivedBytes) < BUFFERSIZE {
-			io.CopyN(newFile, conn, fileSize-receivedBytes)
-			conn.Read(make([]byte, (receivedBytes+BUFFERSIZE)-fileSize))
+			fmt.Println(fileSize, receivedBytes)
+			_, _ = io.CopyN(newFile, conn, fileSize-receivedBytes)
+			_, _ = conn.Read(make([]byte, (receivedBytes+BUFFERSIZE)-fileSize))
 			break
 		}
-		io.CopyN(newFile, conn, BUFFERSIZE)
+		_, _ = io.CopyN(newFile, conn, BUFFERSIZE)
 		receivedBytes += BUFFERSIZE
 	}
-	fmt.Println("Received file completely!")
+	fmt.Printf("Received %d bytes\n", fileSize)
+
+	return fileName
 }
