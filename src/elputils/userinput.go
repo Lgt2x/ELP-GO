@@ -49,7 +49,7 @@ func InputFilter(conn net.Conn, filterList []string) int {
 }
 
 // Receive and process filter choice, server-side
-func ReceiveFilter(conn net.Conn) {
+func ReceiveFilter(conn net.Conn, maxFil int) int {
 	filterValidated := false
 	for filterValidated != true {
 		filterStr := strings.Trim(ReceiveString(conn, '\n'), "\n")
@@ -58,15 +58,18 @@ func ReceiveFilter(conn net.Conn) {
 			panic(err)
 		}
 
-		if filter <= 2 {
+		if filter > 0 && filter <= maxFil {
 			fmt.Printf("Received filter : %s\n", filterStr)
 			SendString(conn, "1\n")
 			filterValidated = true
+			return filter
 		} else {
 			fmt.Printf("Invalid filter : %s\n", filterStr)
 			SendString(conn, "1\n")
 		}
 	}
+
+	return 0
 }
 
 // Inputs an image path
@@ -79,7 +82,7 @@ func InputImagePath() string {
 		return imagePath
 	}
 	// To it again if it fails
-	fmt.Print("File not found")
+	fmt.Println("File not found")
 	return InputImagePath()
 }
 

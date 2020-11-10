@@ -385,7 +385,18 @@ func NoiseReductionRGB(img image.Image, nbIterations int, n int) image.Image { /
 	return imgDebruit
 }
 
-func Dispatch(img image.Image, n int, param1 int, param2 int) image.Image { //permet de sélectionner quelle transfo en fonction de l'entrée utilisateur du programme principal
+var FilterList = []string{
+	"Negative Black & white",
+	"Negative RGB",
+	"Grey scale",
+	"Uniform Blur",
+	"Gauss Blur",
+	"Noise reduction",
+	"Boundary detection",
+	"Boundaries with Prewitt",
+}
+
+func Dispatch(img image.Image, n int) image.Image { //permet de sélectionner quelle transfo en fonction de l'entrée utilisateur du programme principal
 	//variable param pour les traitement nécessitant un niveau de puissance selectionné par l'utilisateur
 	var res image.Image
 
@@ -408,20 +419,20 @@ func Dispatch(img image.Image, n int, param1 int, param2 int) image.Image { //pe
 		break
 
 	case 5:
-		res = GaussBlur(img, param1) //param1=taille matrice /!\ nb impairs= puissance du flou en fct de la résolution et de l'envie de l'utilisateur
+		res = GaussBlur(img, 5) //param1=taille matrice /!\ nb impairs= puissance du flou en fct de la résolution et de l'envie de l'utilisateur
 		break
 
 	case 6:
-		res = NoiseReductionBW(img, param1, param2) //param1 = nbIteration du filtre 1 à 2 conseillé
+		res = NoiseReductionBW(img, 1, 5) //param1 = nbIteration du filtre 1 à 2 conseillé
 		//param2 = taille matrice 5 conseillé (nombres impairs /!\)
 		break
 
 	case 7:
-		res = Boundaries(img, param1) //param1 = puissance de séparation en paramètre 8 voire 16, plus c'est élevé plus seuls les "gros" Boundaries seront visibles
+		res = Boundaries(img, 8) //param1 = puissance de séparation en paramètre 8 voire 16, plus c'est élevé plus seuls les "gros" Boundaries seront visibles
 		break
 
 	case 8:
-		res = PrewittBorders(img, param1) //pareil que Boundaries mais utilise le filtre de Prewitt à la place
+		res = PrewittBorders(img, 8) //pareil que Boundaries mais utilise le filtre de Prewitt à la place
 		break
 
 	}

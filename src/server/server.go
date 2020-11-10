@@ -56,12 +56,11 @@ func handleConnection(connection net.Conn, connId int) {
 	fmt.Printf("New connection with a client, id %d\n", connId)
 
 	// Send available filters as contatenated array
-	filterList := []string{"Black & white", "Invert color"}
 	fmt.Println("Sending filter list to the client")
-	elputils.SendArray(connection, filterList)
+	elputils.SendArray(connection, elputils.FilterList)
 
 	// Receive filter and send back 1 or 0 wether it's valid or not
-	elputils.ReceiveFilter(connection)
+	filter := elputils.ReceiveFilter(connection, len(elputils.FilterList))
 
 	// Receive image blob and store it in a temp file
 	fmt.Println("Receiving image...")
@@ -72,7 +71,8 @@ func handleConnection(connection net.Conn, connId int) {
 	// Apply filter
 	fmt.Println("Applying filter")
 	imageTest := elputils.FileToImage(og_name)
-	elputils.ImageToFile(elputils.NegativeRGB(imageTest), modif_name)
+	convert := elputils.Dispatch(imageTest, filter)
+	elputils.ImageToFile(convert, modif_name)
 	//fileModified := "img_modif.jpg"
 
 	// Send back the file

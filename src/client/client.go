@@ -33,7 +33,7 @@ func main() {
 	// Input filter
 	filterList := elputils.ReceiveArray(conn, ";", '\n')
 	filterNum := elputils.InputFilter(conn, filterList)
-	fmt.Printf("Selected filter '%s'\n", filterList[filterNum])
+	fmt.Printf("Selected filter '%s'\n", filterList[filterNum-1])
 
 	// Input image filename
 	imagePath := elputils.InputImagePath()
