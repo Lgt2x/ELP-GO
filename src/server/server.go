@@ -19,10 +19,7 @@ func main() {
 	}
 
 	// Create temp dir for files
-	err := os.Mkdir("tmp", 0755)
-	if err != nil {
-		fmt.Println("Coudln't create tmp folder")
-	}
+	_ = os.Mkdir("tmp", 0755)
 	//defer os.RemoveAll("tmp")
 
 	// Listen on TCP port PORT

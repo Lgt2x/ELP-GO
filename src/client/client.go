@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"strings"
 )
 
 func main() {
@@ -26,7 +27,7 @@ func main() {
 	}
 
 	// Connection successful, close the connection when it's over
-	fmt.Printf("Connection established with server on port %s\n", PORT)
+	fmt.Printf("Connection established with server on port %s\n\n", PORT)
 	defer conn.Close()
 
 	// Input filter
@@ -40,6 +41,10 @@ func main() {
 	// Input image filename
 	imagePath, imagePathAbs := elputils.InputImagePath()
 
+	// Input output file
+	fmt.Println("Enter the output file name")
+	outputFile := strings.Trim(elputils.InputString(), "\n")
+
 	// Send image filename to the server
 	fmt.Println("Sending filename")
 	elputils.SendString(conn, imagePath+"\n")
@@ -50,6 +55,6 @@ func main() {
 
 	// Receiving the modified image
 	fmt.Println("Waiting for the modified image...")
-	elputils.ReceiveFile(conn, "client_modif.jpg")
-	fmt.Println("Received modified image !")
+	elputils.ReceiveFile(conn, outputFile)
+	fmt.Println("Transformation complete, output in ", outputFile)
 }

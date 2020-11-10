@@ -16,11 +16,11 @@ import (
 func InputString() string {
 	reader := bufio.NewReader(os.Stdin)
 	fmt.Print("> ")
-	filter, err := reader.ReadString('\n')
+	inputstr, err := reader.ReadString('\n')
 	if err != nil {
 		panic(err)
 	}
-	return filter
+	return inputstr
 }
 
 // Input filter, client-side
