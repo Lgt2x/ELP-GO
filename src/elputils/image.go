@@ -12,27 +12,39 @@ import (
 	"os"
 )
 
-func WriteToFile(image2 image.Image) {
-	output, err := os.Create("img_modif.jpg") //création du fichier image_utils de sortie
-
-	err = png.Encode(output, image2) //écriture de l'image_utils
-	err = output.Close()
+// Write an image object to a file
+func ImageToFile(image image.Image, destination string) {
+	// Create blank file
+	output, err := os.Create(destination)
 	if err != nil {
-		fmt.Println("Erreur dans la création du fichier!")
+		fmt.Println("Couldn't create file", destination)
 	}
+
+	err = png.Encode(output, image)
+	if err != nil {
+		fmt.Println("Couldn't write image to file", destination)
+	}
+
+	_ = output.Close()
 }
 
-func ImportImage(path string) image.Image {
+// Creates an image object from a file
+func FileToImage(path string) image.Image {
 	input, err := os.Open(path)
+	if err != nil {
+		fmt.Println("Coudln't open file", path)
+	}
+
 	img, err := jpeg.Decode(input)
 
 	if err != nil {
-		fmt.Println("Erreur dans l'importation de l'image_utils!")
+		fmt.Println("Coudln't import image")
 	}
 
 	return img
 }
 
+// Converts image to Black & White
 func GreyScale(img image.Image) image.Image {
 	imgGris := image.NewGray(img.Bounds())
 
@@ -51,7 +63,8 @@ func GreyScale(img image.Image) image.Image {
 	return imgGris
 }
 
-func NegativeBW(img image.Image) image.Image { //image_utils négatif en noir en blanc
+// Converts image to black & white negative
+func NegativeBW(img image.Image) image.Image {
 	imgGris := GreyScale(img)
 	imgNeg := image.NewGray(img.Bounds())
 	for y := img.Bounds().Min.Y; y < img.Bounds().Max.Y; y++ {
@@ -64,7 +77,8 @@ func NegativeBW(img image.Image) image.Image { //image_utils négatif en noir en
 	return imgNeg
 }
 
-func NegativeRGB(img image.Image) image.Image { //négatif couleurs
+// Negative (RGB)
+func NegativeRGB(img image.Image) image.Image {
 	imgNeg := image.NewRGBA(img.Bounds())
 	for y := img.Bounds().Min.Y; y < img.Bounds().Max.Y; y++ {
 		for x := img.Bounds().Min.X; x < img.Bounds().Max.X; x++ {
@@ -97,7 +111,6 @@ func Convolution(x int, y int, img image.Image, coeff [3][3]float64, somme float
 }
 
 func GaussMatrix(n int) ([][]float64, float64) {
-
 	coeff := make([][]float64, n) //création d'une matrice vide de taille n*n
 	for i := 0; i < n; i++ {
 		coeff[i] = make([]float64, n)

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"strconv"
 )
 
 func main() {
@@ -16,6 +17,13 @@ func main() {
 	} else {
 		PORT = "8080"
 	}
+
+	// Create temp dir for files
+	err := os.Mkdir("tmp", 0755)
+	if err != nil {
+		fmt.Println("Coudln't create tmp folder")
+	}
+	//defer os.RemoveAll("tmp")
 
 	// Listen on TCP port PORT
 	ln, err := net.Listen("tcp", ":"+PORT)
@@ -63,27 +71,29 @@ func handleConnection(connection net.Conn, connId int) {
 	fileName := elputils.ReceiveString(connection, '\n')
 	fmt.Printf("Target image %s\n", fileName)
 
-	// Receive image blob
+	// Receive image blob and store it in a temp file
 	fmt.Println("Receiving image...")
-	name := elputils.ReceiveFile(connection, "serv_rec.jpg")
-	fmt.Println(name)
+	og_name := "tmp/og_" + strconv.Itoa(connId) + ".jpg"
+	modif_name := "tmp/modif_" + strconv.Itoa(connId) + ".jpg"
+	fmt.Println(og_name)
+	fmt.Println(modif_name)
+	elputils.ReceiveFile(connection, og_name)
+
 	// Apply filter
 	fmt.Println("Applying filter")
-
-	imageTest := elputils.ImportImage("serv_rec.jpg")
-	elputils.WriteToFile(elputils.NegativeRGB(imageTest))
+	imageTest := elputils.FileToImage(og_name)
+	elputils.ImageToFile(elputils.NegativeRGB(imageTest), modif_name)
 	//fileModified := "img_modif.jpg"
 
-	// Rename & send the file
+	// Send back the file
 	fmt.Printf("Sending back %s\n", fileName)
-
-	elputils.UploadFile(connection, "img_modif.jpg")
+	elputils.UploadFile(connection, modif_name)
 
 	// Close connection
 	fmt.Printf("Closing connection with client %d\n", connId)
 	connection.Close()
 
 	// Delete temp files
-	elputils.DeleteFile("img_modif.jpg")
-	//elputils.DeleteFile("serv_rec.jpg")
+	elputils.DeleteFile(og_name)
+	elputils.DeleteFile(modif_name)
 }

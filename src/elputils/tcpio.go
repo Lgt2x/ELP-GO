@@ -81,8 +81,8 @@ func UploadFile(conn net.Conn, srcFile string) {
 	return
 }
 
-// Receive a file and copy it to current directory
-func ReceiveFile(conn net.Conn, destination string) string {
+// Receive a file and copy it to specificed location
+func ReceiveFile(conn net.Conn, destination string) {
 	bufferFileName := make([]byte, 64)
 	bufferFileSize := make([]byte, 10)
 
@@ -90,7 +90,7 @@ func ReceiveFile(conn net.Conn, destination string) string {
 	fileSize, _ := strconv.ParseInt(strings.Trim(string(bufferFileSize), ":"), 10, 64)
 
 	_, _ = conn.Read(bufferFileName)
-	fileName := strings.Trim(string(bufferFileName), ":")
+	//fileName := strings.Trim(string(bufferFileName), ":")
 	newFile, err := os.Create(destination)
 
 	if err != nil {
@@ -112,5 +112,4 @@ func ReceiveFile(conn net.Conn, destination string) string {
 	}
 	fmt.Printf("Received %d bytes\n", fileSize)
 
-	return fileName
 }
