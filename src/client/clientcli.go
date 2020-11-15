@@ -5,8 +5,6 @@ import (
 	"fmt"
 	"net"
 	"os"
-	"strconv"
-	"strings"
 )
 
 func usage() {
@@ -16,18 +14,19 @@ func main() {
 	// Get arguments from argc : port number, filter id, source image, destination
 
 	var port string
-	var filter_id int
-	var source_img string
-	var dest_img string
+	var filterId string
+	var sourceImg string
+	var destImg string
 
-	if len(os.Args) != 5 {
-		port := ":" + os.Args[1]
-		err, filter_id := strconv.Atoi(os.Args[2])
-		source_img := os.Args[3]
-		dest_img := os.Args[4]
+	if len(os.Args) == 5 {
+		port = ":" + os.Args[1]
+		filterId = os.Args[2]
+		sourceImg = os.Args[3]
+		destImg = os.Args[4]
 	} else {
 		fmt.Println("Wrong number of arguments")
 		usage()
+		os.Exit(1)
 	}
 
 	// Connecting to the server on port
@@ -43,17 +42,24 @@ func main() {
 	fmt.Printf("Connection established with server on port %s\n\n", port)
 	defer conn.Close()
 
-	// Input filter
-	filterList := elputils.ReceiveArray(conn, ";", '\n')
-	filterNum := elputils.InputFilter(conn, filterList)
-	fmt.Printf("Selected filter '%s'\n", filterList[filterNum-1])
+	// Send filter
+	_ = elputils.ReceiveArray(conn, ";", '\n') // Ignore filter list sent
+	elputils.SendString(conn, filterId+"\n")
+	filterResult := elputils.ReceiveString(conn, '\n')
+
+	// Get an error if the filter can't be found
+	if filterResult == "0" {
+		fmt.Println("Server couldn't apply requested filter. Is the provided id valid ?")
+		os.Exit(1)
+	}
+	fmt.Printf("Selected filter '%s'\n", filterId)
 
 	// Send file
-	fmt.Println("Sending image", source_img)
-	elputils.UploadFile(conn, source_img)
+	fmt.Println("Sending image", sourceImg)
+	elputils.UploadFile(conn, sourceImg)
 
-	// Receiving the modified image
+	// Receiving and storing the modified image
 	fmt.Println("\nWaiting for the modified image...")
-	elputils.ReceiveFile(conn, dest_img)
-	fmt.Println("Transformation complete, output stored in ", dest_img)
+	elputils.ReceiveFile(conn, destImg)
+	fmt.Println("Transformation complete, output stored in ", destImg)
 }

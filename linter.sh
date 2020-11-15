@@ -1,4 +1,4 @@
 #!/bin/bash
 
-gofmt -w src/elp/main.go
-goimports -w src/elp/main.go
+gofmt -w src
+goimports -w src
