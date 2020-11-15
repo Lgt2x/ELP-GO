@@ -4,11 +4,15 @@ import (
 	"fmt"
 	"image"
 	"image/color"
+	"image/draw"
 	"image/jpeg"
 	"image/png"
 	"math"
 	"os"
+	"sync"
 )
+
+var mu sync.Mutex
 
 func ecritureFichier(image2 image.Image) {
 	output, err := os.Create("img_modif.png") //création du fichier image de sortie
@@ -21,7 +25,7 @@ func ecritureFichier(image2 image.Image) {
 }
 
 func importImage() image.Image {
-	input, err := os.Open("C:/Users/antoi/pictures/noise4.jpg")
+	input, err := os.Open("C:/Users/antoi/pictures/platja_swag.jpg")
 	img, err := jpeg.Decode(input)
 
 	if err != nil {
@@ -62,16 +66,21 @@ func negatifNB(img image.Image) image.Image { //image négatif en noir en blanc
 	return imgNeg
 }
 
-func negatifRVB(img image.Image) image.Image { //négatif couleurs
-	imgNeg := image.NewRGBA(img.Bounds())
-	for y := img.Bounds().Min.Y; y < img.Bounds().Max.Y; y++ {
-		for x := img.Bounds().Min.X; x < img.Bounds().Max.X; x++ {
-			r, v, b, _ := img.At(x, y).RGBA()
+func negatifRVB(img *image.Image, res *image.Image, wg *sync.WaitGroup, minX int, minY int, maxX int, maxY int) { //négatif couleurs
+	//mu.Lock()
+	imgNeg := image.NewRGBA((*img).Bounds())
+	//mu.Unlock()
+	for y := minY; y < maxY; y++ {
+		for x := minX; x < maxX; x++ {
+			//mu.Lock()
+			r, v, b, _ := (*img).At(x, y).RGBA()
+			//mu.Unlock()
 			pix := color.RGBA{R: 255 - uint8(r/256), G: 255 - uint8(v/256), B: 255 - uint8(b/256), A: 0xff}
 			imgNeg.Set(x, y, pix)
 		}
 	}
-	return imgNeg
+	*res = imgNeg
+	defer wg.Done()
 }
 
 func convolution(x int, y int, img image.Image, coeff [3][3]float64, somme float64) color.RGBA { //filtre à l'aide d'une matrice de convolution 3x3 un pixel
@@ -369,51 +378,66 @@ func debruitageRVB(img image.Image, nbIterations int, n int) image.Image { //ne 
 	return imgDebruit
 }
 
-func dispatch(img image.Image, n int, param1 int, param2 int) image.Image { //permet de sélectionner quelle transfo en fonction de l'entrée utilisateur du programme principal
-	//variable param pour les traitement nécessitant un niveau de puissance selectionné par l'utilisateur
-	var res image.Image
+func dispatch(img *image.Image, n int, param1 int, param2 int) image.Image { //permet de sélectionner quelle transfo en fonction de l'entrée utilisateur du programme principal
+	//variable param pour les traitements nécessitant un niveau de puissance selectionné par l'utilisateur
+	var img1, img2, img3, img4 image.Image
+	imgRes := image.NewRGBA((*img).Bounds())
+	var wg sync.WaitGroup
+	imgp1, imgp2, imgp3, imgp4 := &img1, &img2, &img3, &img4
+
+	maxX := (*img).Bounds().Max.X
+	maxY := (*img).Bounds().Max.Y
 
 	switch n {
 
 	case 1:
-		res = negatifNB(img)
+		//negatifNB(img)
 		break
 
 	case 2:
-		res = negatifRVB(img)
+		wg.Add(4)
+		go negatifRVB(img, imgp1, &wg, 0, 0, maxX/2, maxY/2)
+		go negatifRVB(img, imgp2, &wg, maxX/2, 0, maxX, maxY/2)
+		go negatifRVB(img, imgp3, &wg, 0, maxY/2, maxX/2, maxY)
+		go negatifRVB(img, imgp4, &wg, maxX/2, maxY/2, maxX, maxY)
+		wg.Wait()
 		break
 
 	case 3:
-		res = niveauGris(img)
+		//niveauGris(img)
 		break
 
 	case 4:
-		res = flouUniforme(img)
+		//flouUniforme(img)
 		break
 
 	case 5:
-		res = flouGauss(img, param1) //param1=taille matrice /!\ nb impairs= puissance du flou en fct de la résolution et de l'envie de l'utilisateur
+		//flouGauss(img, param1) //param1=taille matrice /!\ nb impairs= puissance du flou en fct de la résolution et de l'envie de l'utilisateur
 		break
 
 	case 6:
-		res = debruitageNB(img, param1, param2) //param1 = nbIteration du filtre 1 à 2 conseillé
+		//debruitageNB(img, param1, param2) //param1 = nbIteration du filtre 1 à 2 conseillé
 		//param2 = taille matrice 5 conseillé (nombres impairs /!\)
 		break
 
 	case 7:
-		res = contours(img, param1) //param1 = puissance de séparation en paramètre 8 voire 16, plus c'est élevé plus seuls les "gros" contours seront visibles
+		//contours(img, param1) //param1 = puissance de séparation en paramètre 8 voire 16, plus c'est élevé plus seuls les "gros" contours seront visibles
 		break
 
 	case 8:
-		res = contoursPrewitt(img, param1) //pareil que contours mais utilise le filtre de Prewitt à la place
+		//contoursPrewitt(img, param1) //pareil que contours mais utilise le filtre de Prewitt à la place
 		break
 
 	}
 
-	return res
+	draw.Draw(imgRes, image.Rect(0, 0, maxX/2, maxY/2), img1, image.Point{}, draw.Src)
+	draw.Draw(imgRes, image.Rect(maxX/2, 0, maxX, maxY/2), img2, image.Point{maxX / 2, 0}, draw.Src)
+	draw.Draw(imgRes, image.Rect(0, maxY/2, maxX/2, maxY), img3, image.Point{0, maxY / 2}, draw.Src)
+	draw.Draw(imgRes, image.Rect(maxX/2, maxY/2, maxX, maxY), img4, image.Point{maxX / 2, maxY / 2}, draw.Src)
+	return imgRes
 }
 
 func main() {
 	imageTest := importImage()
-	ecritureFichier(debruitageRVB(imageTest, 3, 7))
+	ecritureFichier(dispatch(&imageTest, 2, 0, 0))
 }
