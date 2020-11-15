@@ -473,10 +473,10 @@ func Dispatch(img *image.RGBA, n int) image.Image { //permet de sélectionner qu
 		break //attention : il faut rajouter le filtre NegativeBW !!
 
 	case 8:
-		go PrewittBorders(img, imgp1, 8, &wg, 0, 0, maxX/2, maxY/2)
-		go PrewittBorders(img, imgp2, 8, &wg, maxX/2, 0, maxX+1, maxY/2)
-		go PrewittBorders(img, imgp3, 8, &wg, 0, maxY/2, maxX/2, maxY+1)
-		go PrewittBorders(img, imgp4, 8, &wg, maxX/2, maxY/2, maxX+1, maxY+1) //pareil que Boundaries mais utilise le filtre de Prewitt à la place
+		go PrewittBorders(img, imgp1, 32, &wg, 0, 0, maxX/2, maxY/2)
+		go PrewittBorders(img, imgp2, 32, &wg, maxX/2, 0, maxX+1, maxY/2)
+		go PrewittBorders(img, imgp3, 32, &wg, 0, maxY/2, maxX/2, maxY+1)
+		go PrewittBorders(img, imgp4, 32, &wg, maxX/2, maxY/2, maxX+1, maxY+1) //pareil que Boundaries mais utilise le filtre de Prewitt à la place
 		break
 
 	}
