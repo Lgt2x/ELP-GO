@@ -10,6 +10,7 @@ import (
 	"math"
 	"os"
 	"sync"
+	"time"
 )
 
 var mu sync.Mutex
@@ -122,7 +123,7 @@ func calculGauss(n int) ([][]float64, float64) {
 	return coeff, somme
 }
 
-func convolutionGauss(x int, y int, img image.Image, n int, coeff [][]float64, somme float64) color.RGBA { //convolution avec la fonction de gauss avec une matrice de taille n
+func convolutionGauss(x int, y int, img image.Image, n int, coeff *[][]float64, somme float64) color.RGBA { //convolution avec la fonction de gauss avec une matrice de taille n
 	var pix color.RGBA
 	var r, v, b float64
 	r = 0
@@ -131,10 +132,10 @@ func convolutionGauss(x int, y int, img image.Image, n int, coeff [][]float64, s
 
 	for i := -n / 2; i <= n/2; i++ {
 		for j := -n / 2; j <= n/2; j++ {
-			rouge, vert, bleu, _ := img.At(x+i, y+j).RGBA()
-			r += coeff[i+n/2][j+n/2] * float64(rouge)
-			v += coeff[i+n/2][j+n/2] * float64(vert)
-			b += coeff[i+n/2][j+n/2] * float64(bleu)
+			rouge, vert, bleu, _ := (img).At(x+i, y+j).RGBA()
+			r += (*coeff)[i+n/2][j+n/2] * float64(rouge)
+			v += (*coeff)[i+n/2][j+n/2] * float64(vert)
+			b += (*coeff)[i+n/2][j+n/2] * float64(bleu)
 
 		}
 	}
@@ -142,17 +143,18 @@ func convolutionGauss(x int, y int, img image.Image, n int, coeff [][]float64, s
 	return pix
 }
 
-func flouGauss(img image.Image, n int) image.Image { //flou de gauss avec matrice de taille n (plus n est grand plus l'effet est important), peut-etre faire plusieurs itérations
-	imgFlou := image.NewRGBA(img.Bounds())
+func flouGauss(img *image.Image, res *image.Image, n int, wg *sync.WaitGroup, minX int, minY int, maxX int, maxY int) { //flou de gauss avec matrice de taille n (plus n est grand plus l'effet est important), peut-etre faire plusieurs itérations
+	imgFlou := image.NewRGBA((*img).Bounds())
 	coeff, somme := calculGauss(n)
 
-	for y := img.Bounds().Min.Y + 2; y < img.Bounds().Max.Y-2; y++ {
-		for x := img.Bounds().Min.X + 2; x < img.Bounds().Max.X-2; x++ {
-			imgFlou.Set(x, y, convolutionGauss(x, y, img, n, coeff, somme))
+	for y := minY; y < maxY; y++ {
+		for x := minX; x < maxX; x++ {
+			imgFlou.Set(x, y, convolutionGauss(x, y, *img, n, &coeff, somme))
 		}
 	}
 
-	return imgFlou
+	*res = imgFlou
+	wg.Done()
 }
 
 func flouUniforme(img image.Image) image.Image { //applique un filtre uniforme 3x3 à chaque pixel
@@ -275,7 +277,7 @@ func despeckleNB(img image.Image, x int, y int, n int, coeffGauss [][]float64, s
 
 	if float64(t) <= moyenne-stdev || float64(t) >= moyenne+stdev {
 
-		t = uint32(convolutionGauss(x, y, img, 3, coeffGauss, sommeGauss).R) //on prend la composante rouge ici mais peu importe vu qu'on est en niveaux de gris
+		t = uint32(convolutionGauss(x, y, img, 3, &coeffGauss, sommeGauss).R) //on prend la composante rouge ici mais peu importe vu qu'on est en niveaux de gris
 	}
 
 	pix := color.Gray{Y: uint8(t)} //on reconstruit le pixel modifié
@@ -323,13 +325,13 @@ func despeckleRVB(img image.Image, x int, y int, n int, coeffGauss [][]float64, 
 	r, v, b, _ := img.At(x, y).RGBA()
 
 	if float64(r) <= moyenneR-stdevR || float64(r) >= moyenneR+stdevR {
-		r = uint32(convolutionGauss(x, y, img, 3, coeffGauss, sommeGauss).R)
+		r = uint32(convolutionGauss(x, y, img, 3, &coeffGauss, sommeGauss).R)
 	}
 	if float64(v) <= moyenneV-stdevV || float64(v) >= moyenneV+stdevV {
-		v = uint32(convolutionGauss(x, y, img, 3, coeffGauss, sommeGauss).G)
+		v = uint32(convolutionGauss(x, y, img, 3, &coeffGauss, sommeGauss).G)
 	}
 	if float64(b) <= moyenneB-stdevB || float64(b) >= moyenneR+stdevB {
-		b = uint32(convolutionGauss(x, y, img, 3, coeffGauss, sommeGauss).B)
+		b = uint32(convolutionGauss(x, y, img, 3, &coeffGauss, sommeGauss).B)
 	}
 
 	pix := color.RGBA{R: uint8(r), G: uint8(v), B: uint8(b), A: 0xff} //on reconstruit le pixel modifié
@@ -388,6 +390,8 @@ func dispatch(img *image.Image, n int, param1 int, param2 int) image.Image { //p
 	maxX := (*img).Bounds().Max.X
 	maxY := (*img).Bounds().Max.Y
 
+	wg.Add(4)
+
 	switch n {
 
 	case 1:
@@ -395,12 +399,12 @@ func dispatch(img *image.Image, n int, param1 int, param2 int) image.Image { //p
 		break
 
 	case 2:
-		wg.Add(4)
+
 		go negatifRVB(img, imgp1, &wg, 0, 0, maxX/2, maxY/2)
 		go negatifRVB(img, imgp2, &wg, maxX/2, 0, maxX, maxY/2)
 		go negatifRVB(img, imgp3, &wg, 0, maxY/2, maxX/2, maxY)
 		go negatifRVB(img, imgp4, &wg, maxX/2, maxY/2, maxX, maxY)
-		wg.Wait()
+
 		break
 
 	case 3:
@@ -412,7 +416,10 @@ func dispatch(img *image.Image, n int, param1 int, param2 int) image.Image { //p
 		break
 
 	case 5:
-		//flouGauss(img, param1) //param1=taille matrice /!\ nb impairs= puissance du flou en fct de la résolution et de l'envie de l'utilisateur
+		go flouGauss(img, imgp1, 7, &wg, 2, 2, maxX/2, maxY/2) //param1=taille matrice /!\ nb impairs= puissance du flou en fct de la résolution et de l'envie de l'utilisateur
+		go flouGauss(img, imgp2, 7, &wg, maxX/2, 2, maxX-2, maxY/2)
+		go flouGauss(img, imgp3, 7, &wg, 2, maxY/2, maxX/2, maxY-2)
+		go flouGauss(img, imgp4, 7, &wg, maxX/2, maxY/2, maxX-2, maxY-2)
 		break
 
 	case 6:
@@ -429,15 +436,19 @@ func dispatch(img *image.Image, n int, param1 int, param2 int) image.Image { //p
 		break
 
 	}
+	wg.Wait()
 
 	draw.Draw(imgRes, image.Rect(0, 0, maxX/2, maxY/2), img1, image.Point{}, draw.Src)
-	draw.Draw(imgRes, image.Rect(maxX/2, 0, maxX, maxY/2), img2, image.Point{maxX / 2, 0}, draw.Src)
-	draw.Draw(imgRes, image.Rect(0, maxY/2, maxX/2, maxY), img3, image.Point{0, maxY / 2}, draw.Src)
-	draw.Draw(imgRes, image.Rect(maxX/2, maxY/2, maxX, maxY), img4, image.Point{maxX / 2, maxY / 2}, draw.Src)
+	draw.Draw(imgRes, image.Rect(maxX/2, 0, maxX, maxY/2), img2, image.Point{X: maxX / 2}, draw.Src)
+	draw.Draw(imgRes, image.Rect(0, maxY/2, maxX/2, maxY), img3, image.Point{Y: maxY / 2}, draw.Src)
+	draw.Draw(imgRes, image.Rect(maxX/2, maxY/2, maxX, maxY), img4, image.Point{X: maxX / 2, Y: maxY / 2}, draw.Src)
+
 	return imgRes
 }
 
 func main() {
+	fmt.Println(time.Now())
 	imageTest := importImage()
-	ecritureFichier(dispatch(&imageTest, 2, 0, 0))
+	ecritureFichier(dispatch(&imageTest, 5, 0, 0))
+	fmt.Println(time.Now())
 }
