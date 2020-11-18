@@ -77,7 +77,12 @@ func InputImagePath() string {
 	fmt.Print("Relative path to the image ")
 	imagePath := strings.Trim(InputString(), "\n")
 	imagePathAbs, _ := filepath.Abs(imagePath)
-
+	//fmt.Println(imagepath)
+	//filter .jpg image only
+	if !strings.HasSuffix(imagePath,".jpg")&&!strings.HasSuffix(imagePath, ".jpeg"){
+		fmt.Println("Unsupported format")
+		return InputImagePath()
+	}
 	if FileExists(imagePathAbs) {
 		return imagePath
 	}
