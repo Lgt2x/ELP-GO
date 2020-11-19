@@ -38,38 +38,34 @@ func FileToImage(path string) *image.RGBA {
 	}
 
 	img, err := jpeg.Decode(input)
-	imgRes := image.NewRGBA(img.Bounds())
-
 	if err != nil {
 		fmt.Println("Couldn't import image")
-	} else {
+	}
+
+	if img != nil {
+		imgRes := image.NewRGBA(img.Bounds())
+
 		for y := img.Bounds().Min.Y; y <= img.Bounds().Max.Y; y++ {
 			for x := img.Bounds().Min.X; x <= img.Bounds().Max.X; x++ {
 				imgRes.Set(x, y, img.At(x, y))
 			}
 		}
+		return imgRes
 	}
 
-	return imgRes
+	return nil
 }
 
 // Converts image to Black & White
 func GreyScale(img *image.RGBA, res *image.Image, wg *sync.WaitGroup, minX int, minY int, maxX int, maxY int) {
-	imgGris := image.NewGray(image.Rect(minX, minY, maxX, maxY))
+	imgGrey := image.NewGray(image.Rect(minX, minY, maxX, maxY))
 
 	for y := minY; y < maxY; y++ {
 		for x := minX; x < maxX; x++ {
-			imgGris.Set(x, y, (*img).At(x, y))
-
-			/* //si on veut vraiment flex
-			R, G, B, _ := img.At(x, y).RGBA()
-			        //Luma: Y = 0.2126*R + 0.7152*G + 0.0722*B
-			        Y := (0.2126*float64(R) + 0.7152*float64(G) + 0.0722*float64(B)) * (255.0 / 65535)
-			        grayPix := color.Gray{uint8(Y)}
-			*/
+			imgGrey.Set(x, y, (*img).At(x, y))
 		}
 	}
-	*res = imgGris
+	*res = imgGrey
 	if wg != nil {
 		wg.Done()
 	}
@@ -108,7 +104,7 @@ func NegativeRGB(img *image.RGBA, res *image.Image, wg *sync.WaitGroup, minX int
 }
 
 // Filter using a 3x3 convolution matrix
-func Convolution(x int, y int, img *image.RGBA, coeff *[3][3]float64, somme float64) color.RGBA {
+func Convolution(x int, y int, img *image.RGBA, coefficient *[3][3]float64, somme float64) color.RGBA {
 	var pix color.RGBA
 	var r, v, b float64
 	r = 0
@@ -117,9 +113,9 @@ func Convolution(x int, y int, img *image.RGBA, coeff *[3][3]float64, somme floa
 	for i := -1; i <= 1; i++ {
 		for j := -1; j <= 1; j++ {
 			rouge, vert, bleu, _ := (*img).At(x+i, y+j).RGBA()
-			r += coeff[i+1][j+1] * float64(rouge)
-			v += coeff[i+1][j+1] * float64(vert)
-			b += coeff[i+1][j+1] * float64(bleu)
+			r += coefficient[i+1][j+1] * float64(rouge)
+			v += coefficient[i+1][j+1] * float64(vert)
+			b += coefficient[i+1][j+1] * float64(bleu)
 
 		}
 	}
@@ -240,22 +236,6 @@ func PrewittBorders(img *image.RGBA, res *image.Image, puissance int, wg *sync.W
 	wg.Done()
 }
 
-func separation(img image.Image) (image.Image, image.Image, image.Image) { //sert à séparer les 3 composantes de l'image_utils
-	imgR := image.NewRGBA(img.Bounds())
-	imgV := image.NewRGBA(img.Bounds())
-	imgB := image.NewRGBA(img.Bounds())
-
-	for x := img.Bounds().Min.X; x < img.Bounds().Max.X; x++ {
-		for y := img.Bounds().Min.Y; y < img.Bounds().Max.Y; y++ {
-			r, v, b, _ := img.At(x, y).RGBA()
-			imgR.Set(x, y, color.RGBA{R: uint8(r)})
-			imgV.Set(x, y, color.RGBA{G: uint8(v)})
-			imgB.Set(x, y, color.RGBA{B: uint8(b)})
-		}
-	}
-	return imgR, imgV, imgB
-}
-
 func DespeckleBW(img *image.RGBA, x int, y int, n int, coeffGauss *[][]float64, sommeGauss float64) color.Gray { //réduction de bruit Noir et Blanc : fonctionnel
 	var moyenne, stdev float64
 	moyenne, stdev = 0, 0
@@ -297,59 +277,6 @@ func DespeckleBW(img *image.RGBA, x int, y int, n int, coeffGauss *[][]float64, 
 
 }
 
-// MARCHE PAS en couleurs
-func DespeckleRGB(img *image.RGBA, x int, y int, n int, coeffGauss *[][]float64, sommeGauss float64) color.RGBA { //déparasitage de chaque composante, n taille matrice
-	var moyenneR, moyenneV, moyenneB float64
-	moyenneB, moyenneR, moyenneV = 0, 0, 0
-
-	var stdevR, stdevV, stdevB float64 //écart-type
-	stdevR, stdevV, stdevB = 0, 0, 0
-
-	//on calcule la moyenne de chaque pixel voisin au pixel en question pour chaque composante
-	for i := -n / 2; i <= n/2; i++ {
-		for j := -n / 2; j <= n/2; j++ {
-			if i != 0 || j != 0 { //on exclut le pixel central
-				r, v, b, _ := (*img).At(x+i, y+j).RGBA()
-				moyenneR += float64(r)
-				moyenneV += float64(v)
-				moyenneB += float64(b)
-			}
-		}
-	}
-
-	moyenneR, moyenneV, moyenneB = moyenneR/(math.Pow(float64(n), 2)-1), moyenneV/(math.Pow(float64(n), 2)-1), moyenneB/(math.Pow(float64(n), 2)-1)
-
-	//on calcule l'écart-type pour chaque composante
-	for i := -n / 2; i <= n/2; i++ {
-		for j := -n / 2; j <= n/2; j++ {
-			if i != 0 || j != 0 { //on exclut le pixel central
-				r, v, b, _ := (*img).At(x+i, y+j).RGBA()
-				stdevR += math.Pow(float64(r)-moyenneR, 2)
-				stdevV += math.Pow(float64(v)-moyenneV, 2)
-				stdevB += math.Pow(float64(b)-moyenneB, 2)
-			}
-		}
-	}
-
-	stdevR, stdevV, stdevB = math.Sqrt(stdevR/(math.Pow(float64(n), 2)-1)), math.Sqrt(stdevV/(math.Pow(float64(n), 2)-1)), math.Sqrt(stdevB/(math.Pow(float64(n), 2)-1))
-
-	//on teste ensuite le pixel central s'il est dans l'intervalle moyenne +/- écart-type sinon il prend on applique un filtre gaussien sur le pixel
-	r, v, b, _ := (*img).At(x, y).RGBA()
-
-	if float64(r) <= moyenneR-stdevR || float64(r) >= moyenneR+stdevR {
-		r = uint32(ConvolutionGauss(x, y, img, 3, coeffGauss, sommeGauss).R)
-	}
-	if float64(v) <= moyenneV-stdevV || float64(v) >= moyenneV+stdevV {
-		v = uint32(ConvolutionGauss(x, y, img, 3, coeffGauss, sommeGauss).G)
-	}
-	if float64(b) <= moyenneB-stdevB || float64(b) >= moyenneR+stdevB {
-		b = uint32(ConvolutionGauss(x, y, img, 3, coeffGauss, sommeGauss).B)
-	}
-
-	pix := color.RGBA{R: uint8(r), G: uint8(v), B: uint8(b), A: 0xff} //on reconstruit le pixel modifié
-	return pix
-}
-
 func NoiseReductionBW(img *image.RGBA, res *image.Image, nbIterations int, n int, wg *sync.WaitGroup, minX int, minY int, maxX int, maxY int) {
 	imgDebruit := image.NewRGBA(image.Rect(minX, minY, maxX, maxY))
 	coeffGauss, sommeGauss := GaussMatrix(3)
@@ -370,27 +297,6 @@ func NoiseReductionBW(img *image.RGBA, res *image.Image, nbIterations int, n int
 
 	*res = imgDebruit
 	wg.Done()
-}
-
-func NoiseReductionRGB(img image.RGBA, nbIterations int, n int) image.Image { //ne marche pas bien, n'est pas référencé dans le Dispatch
-	imgDebruit := image.NewRGBA(img.Bounds())
-	coeffGauss, sommeGauss := GaussMatrix(3)
-
-	for y := img.Bounds().Min.Y + n/2; y < img.Bounds().Max.Y-n/2; y++ {
-		for x := img.Bounds().Min.X + n/2; x < img.Bounds().Max.X-n/2; x++ {
-			imgDebruit.Set(x, y, DespeckleRGB(&img, x, y, n, &coeffGauss, sommeGauss))
-		}
-	}
-
-	for k := 0; k < nbIterations-1; k++ {
-		for y := img.Bounds().Min.Y + n/2; y < img.Bounds().Max.Y-n/2; y++ {
-			for x := img.Bounds().Min.X + n/2; x < img.Bounds().Max.X-n/2; x++ {
-				imgDebruit.Set(x, y, DespeckleRGB(imgDebruit, x, y, n, &coeffGauss, sommeGauss))
-			}
-		}
-	}
-
-	return imgDebruit
 }
 
 var FilterList = []string{
