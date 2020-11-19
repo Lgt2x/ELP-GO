@@ -16,11 +16,11 @@ import (
 func InputString() string {
 	reader := bufio.NewReader(os.Stdin)
 	fmt.Print("> ")
-	inputstr, err := reader.ReadString('\n')
+	input, err := reader.ReadString('\n')
 	if err != nil {
 		panic(err)
 	}
-	return inputstr
+	return input
 }
 
 // Input filter, client-side
@@ -37,9 +37,9 @@ func InputFilter(conn net.Conn, filterList []string) int {
 	// Send and validate filter id
 	SendString(conn, filter)
 	validationServer := ReceiveString(conn, '\n')
-	filtre_valide := strings.Compare(validationServer[0:1], "1")
+	validFilter := strings.Compare(validationServer[0:1], "1")
 
-	if filtre_valide != 0 {
+	if validFilter != 0 {
 		fmt.Println("Invalid choice")
 		// Try again if invalid
 		InputFilter(conn, filterList)
@@ -77,10 +77,10 @@ func InputImagePath() string {
 	fmt.Print("Relative path to the image ")
 	imagePath := strings.Trim(InputString(), "\n")
 	imagePathAbs, _ := filepath.Abs(imagePath)
-	//fmt.Println(imagepath)
-	//filter .jpg image only
-	if !strings.HasSuffix(imagePath,".jpg")&&!strings.HasSuffix(imagePath, ".jpeg"){
-		fmt.Println("Unsupported format")
+
+	// Filter .jpg images only
+	if !strings.HasSuffix(imagePath, ".jpg") && !strings.HasSuffix(imagePath, ".jpeg") {
+		fmt.Println("Unsupported image format. Use a jpeg image")
 		return InputImagePath()
 	}
 	if FileExists(imagePathAbs) {
@@ -99,22 +99,16 @@ func FileExists(filepath string) bool {
 	return false
 }
 
-func FillString(retunString string, toLength int) string {
+func FillString(returnString string, toLength int) string {
 	for {
-		lengtString := len(retunString)
-		if lengtString < toLength {
-			retunString = retunString + ":"
+		stringLength := len(returnString)
+		if stringLength < toLength {
+			returnString = returnString + ":"
 			continue
 		}
 		break
 	}
-	return retunString
-}
-
-func NewName(filename string) string {
-	// find the extension, store it then delete it
-	indexExt := strings.Index(filename, ".")
-	return filename[:indexExt] + "_modified" + filename[indexExt:]
+	return returnString
 }
 
 // Delete the file filename

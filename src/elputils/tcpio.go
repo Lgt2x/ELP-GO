@@ -12,12 +12,12 @@ import (
 	"strings"
 )
 
-const BUFFERSIZE = 1024
+const BufferSize = 1024
 
 // Send a string using the specified connection object
-func SendString(conn net.Conn, chaine string) {
-	// send the string chaine
-	_, err := io.WriteString(conn, fmt.Sprint(chaine))
+func SendString(conn net.Conn, string string) {
+	// send the string string
+	_, err := io.WriteString(conn, fmt.Sprint(string))
 	if err != nil {
 		panic(err)
 	}
@@ -41,8 +41,8 @@ func SendArray(conn net.Conn, array []string) {
 }
 
 // Receive an array of strings
-func ReceiveArray(conn net.Conn, delimiter string, delimEnd byte) []string {
-	message, err := bufio.NewReader(conn).ReadString(delimEnd)
+func ReceiveArray(conn net.Conn, delimiter string, delimitEnd byte) []string {
+	message, err := bufio.NewReader(conn).ReadString(delimitEnd)
 	if err != nil {
 		panic(err)
 	}
@@ -66,7 +66,7 @@ func UploadFile(conn net.Conn, srcFile string) {
 
 	_, _ = conn.Write([]byte(fileSize))
 	_, _ = conn.Write([]byte(fileName))
-	sendBuffer := make([]byte, BUFFERSIZE)
+	sendBuffer := make([]byte, BufferSize)
 	for {
 		_, err = file.Read(sendBuffer)
 		if err == io.EOF {
@@ -77,7 +77,7 @@ func UploadFile(conn net.Conn, srcFile string) {
 	}
 }
 
-// Receive a file and copy it to specificed location
+// Receive a file and copy it to specified location
 func ReceiveFile(conn net.Conn, destination string) {
 	bufferFileName := make([]byte, 64)
 	bufferFileSize := make([]byte, 10)
@@ -97,13 +97,13 @@ func ReceiveFile(conn net.Conn, destination string) {
 
 	fmt.Println("Start receiving")
 	for {
-		if (fileSize - receivedBytes) < BUFFERSIZE {
+		if (fileSize - receivedBytes) < BufferSize {
 			_, _ = io.CopyN(newFile, conn, fileSize-receivedBytes)
-			_, _ = conn.Read(make([]byte, (receivedBytes+BUFFERSIZE)-fileSize))
+			_, _ = conn.Read(make([]byte, (receivedBytes+BufferSize)-fileSize))
 			break
 		}
-		_, _ = io.CopyN(newFile, conn, BUFFERSIZE)
-		receivedBytes += BUFFERSIZE
+		_, _ = io.CopyN(newFile, conn, BufferSize)
+		receivedBytes += BufferSize
 	}
 	fmt.Printf("Received %d bytes\n", fileSize)
 
