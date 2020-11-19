@@ -12,6 +12,9 @@ import (
 	"math"
 	"os"
 	"sync"
+	"strings"
+	"net/http"
+	
 )
 
 // Write an image object to a file
