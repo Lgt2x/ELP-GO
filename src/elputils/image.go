@@ -36,6 +36,18 @@ func FileToImage(path string) *image.RGBA {
 	if err != nil {
 		fmt.Println("Couldn't open file", path)
 	}
+	
+	buffer :=make([]byte, 512)
+	_,errBuf :=input.Read(buffer)
+	if errBuf != nil {
+		fmt.Pintln("couldn't detect file extension")
+	}
+	contentType := http.DetectContentType(buffer)
+        //filter .jpg image only
+	if !strings.HasSuffix(contentType, "jpg")&&!strings.HasSuffix(contentType, "jpeg"){
+		fmt.Println("Unsupported format")
+		return nil
+	}
 
 	img, err := jpeg.Decode(input)
 	imgRes := image.NewRGBA(img.Bounds())
