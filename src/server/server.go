@@ -71,15 +71,16 @@ func handleConnection(connection net.Conn, connId int) {
 	// Apply filter
 	fmt.Println("Applying filter")
 	imageTest := elputils.FileToImage(og_name)
-	convert := elputils.Dispatch(imageTest, filter)
-	elputils.ImageToFile(convert, modif_name)
+	if(imageTest!=nil){
+		convert := elputils.Dispatch(imageTest, filter)
+	        elputils.ImageToFile(convert, modif_name)
 	//fileModified := "img_modif.jpg"
 
 	// Send back the file
-	fmt.Printf("Sending back the modified image\n")
-	elputils.UploadFile(connection, modif_name)
-
-	// Close connection
+	        fmt.Printf("Sending back the modified image\n")
+	        elputils.UploadFile(connection, modif_name)
+	}
+        // Close connection
 	fmt.Printf("Closing connection with client %d\n\n", connId)
 	connection.Close()
 
