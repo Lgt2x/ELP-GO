@@ -71,7 +71,7 @@ func handleConnection(connection net.Conn, connId int) {
 	// Apply filter
 	fmt.Println("Applying filter")
 	imageTest := elputils.FileToImage(og_name)
-	convert := elputils.Dispatch(imageTest, filter)
+	convert := elputils.ApplyFilterAsync(imageTest, filter)
 	elputils.ImageToFile(convert, modif_name)
 	//fileModified := "img_modif.jpg"
 
