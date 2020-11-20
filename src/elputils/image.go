@@ -123,8 +123,8 @@ func FileToImage(path string) *image.RGBA {
 func GreyScale(img *image.RGBA, res *image.Image, rect image.Rectangle) {
 	imgGrey := image.NewGray(rect)
 
-	for y := rect.Min.Y; y < rect.Max.Y; y++ {
-		for x := rect.Min.X; x < rect.Max.X; x++ {
+	for y := rect.Min.Y; y <= rect.Max.Y; y++ {
+		for x := rect.Min.X; x <= rect.Max.X; x++ {
 			imgGrey.Set(x, y, (*img).At(x, y))
 		}
 	}
@@ -136,8 +136,8 @@ func NegativeBW(img *image.RGBA, res *image.Image, rect image.Rectangle) {
 	var imgGris image.Image
 	GreyScale(img, &imgGris, rect)
 	imgNeg := image.NewGray(rect)
-	for y := rect.Min.Y; y < rect.Max.Y; y++ {
-		for x := rect.Min.X; x < rect.Max.X; x++ {
+	for y := rect.Min.Y; y <= rect.Max.Y; y++ {
+		for x := rect.Min.X; x <= rect.Max.X; x++ {
 			z, _, _, _ := imgGris.At(x, y).RGBA()
 			pix := color.Gray{Y: 255 - uint8(z)}
 			imgNeg.Set(x, y, pix)
@@ -149,8 +149,8 @@ func NegativeBW(img *image.RGBA, res *image.Image, rect image.Rectangle) {
 // Negative (RGB)
 func NegativeRGB(img *image.RGBA, res *image.Image, rect image.Rectangle) {
 	imgNeg := image.NewRGBA(rect)
-	for y := rect.Min.Y; y < rect.Max.Y; y++ {
-		for x := rect.Min.X; x < rect.Max.X; x++ {
+	for y := rect.Min.Y; y <= rect.Max.Y; y++ {
+		for x := rect.Min.X; x <= rect.Max.X; x++ {
 			r, v, b, _ := (*img).At(x, y).RGBA()
 			pix := color.RGBA{R: 255 - uint8(r/256), G: 255 - uint8(v/256), B: 255 - uint8(b/256), A: 0xff}
 			imgNeg.Set(x, y, pix)
@@ -223,8 +223,8 @@ func GaussBlur(img *image.RGBA, res *image.Image, n int, rect image.Rectangle) {
 	imgFlou := image.NewRGBA(rect)
 	coeff, somme := GaussMatrix(n)
 
-	for y := rect.Min.Y; y < rect.Max.Y; y++ {
-		for x := rect.Min.X; x < rect.Max.X; x++ {
+	for y := rect.Min.Y; y <= rect.Max.Y; y++ {
+		for x := rect.Min.X; x <= rect.Max.X; x++ {
 			imgFlou.Set(x, y, ConvolutionGauss(x, y, img, n, &coeff, somme))
 		}
 	}
@@ -237,8 +237,8 @@ func UniformBlur(img *image.RGBA, res *image.Image, rect image.Rectangle) { //ap
 	imgFlou := image.NewRGBA((*img).Bounds())
 	coeff := [3][3]float64{{1, 1, 1}, {1, 1, 1}, {1, 1, 1}}
 	somme := 9.0
-	for y := rect.Min.Y; y < rect.Max.Y; y++ {
-		for x := rect.Min.X; x < rect.Max.X; x++ {
+	for y := rect.Min.Y; y <= rect.Max.Y; y++ {
+		for x := rect.Min.X; x <= rect.Max.X; x++ {
 			imgFlou.Set(x, y, Convolution(x, y, img, &coeff, somme))
 		}
 	}
@@ -252,8 +252,8 @@ func Boundaries(img *image.RGBA, res *image.Image, puissance int, rect image.Rec
 	coeff := [3][3]float64{{-1, -1, -1}, {-1, 8, -1}, {-1, -1, -1}} //laplacien
 	//coeff := [3][3]float64{{-2,-2,0},{-2,0,2},{0,2,2}} //sobel
 	somme := float64(puissance) //pose problème entre nv détails , et efficacité ==> eventuellement le proposer en réglage à l'utilisateur
-	for y := rect.Min.Y; y < rect.Max.Y; y++ {
-		for x := rect.Min.X; x < rect.Max.X; x++ {
+	for y := rect.Min.Y; y <= rect.Max.Y; y++ {
+		for x := rect.Min.X; x <= rect.Max.X; x++ {
 			imgCont.Set(x, y, Convolution(x, y, img, &coeff, somme))
 		}
 	}
@@ -269,14 +269,14 @@ func PrewittBorders(img *image.RGBA, res *image.Image, puissance int, rect image
 	coeff2 := [3][3]float64{{-2, -2, 0}, {-2, 0, 2}, {0, 2, 2}}      //Prewitt 90°
 
 	somme := float64(puissance) //pose problème entre nv détails , et efficacité ==> eventuellement le proposer en réglage à l'utilisateur
-	for y := img.Bounds().Min.Y + 1; y < img.Bounds().Max.Y-1; y++ {
-		for x := img.Bounds().Min.X + 1; x < img.Bounds().Max.X-1; x++ {
+	for y := img.Bounds().Min.Y + 1; y <= img.Bounds().Max.Y-1; y++ {
+		for x := img.Bounds().Min.X + 1; x <= img.Bounds().Max.X-1; x++ {
 			imgCont0.Set(x, y, Convolution(x, y, img, &coeff1, somme))
 		}
 	}
 
-	for y := img.Bounds().Min.Y + 1; y < img.Bounds().Max.Y-1; y++ {
-		for x := img.Bounds().Min.X + 1; x < img.Bounds().Max.X-1; x++ {
+	for y := img.Bounds().Min.Y + 1; y <= img.Bounds().Max.Y-1; y++ {
+		for x := img.Bounds().Min.X + 1; x <= img.Bounds().Max.X-1; x++ {
 			imgCont90.Set(x, y, Convolution(x, y, img, &coeff2, somme))
 		}
 	}
@@ -337,15 +337,15 @@ func NoiseReductionBW(img *image.RGBA, res *image.Image, nbIterations int, n int
 	imgDebruit := image.NewRGBA(rect)
 	coeffGauss, sommeGauss := GaussMatrix(3)
 
-	for y := rect.Min.Y; y < rect.Max.Y; y++ {
-		for x := rect.Min.X; x < rect.Max.X; x++ {
+	for y := rect.Min.Y; y <= rect.Max.Y; y++ {
+		for x := rect.Min.X; x <= rect.Max.X; x++ {
 			imgDebruit.Set(x, y, DespeckleBW(img, x, y, n, &coeffGauss, sommeGauss))
 		}
 	}
 
 	for k := 0; k < nbIterations-1; k++ {
-		for y := imgDebruit.Bounds().Min.Y + n/2; y < imgDebruit.Bounds().Max.Y-n/2; y++ {
-			for x := imgDebruit.Bounds().Min.X + n/2; x < imgDebruit.Bounds().Max.X-n/2; x++ {
+		for y := imgDebruit.Bounds().Min.Y + n/2; y <= imgDebruit.Bounds().Max.Y-n/2; y++ {
+			for x := imgDebruit.Bounds().Min.X + n/2; x <= imgDebruit.Bounds().Max.X-n/2; x++ {
 				imgDebruit.Set(x, y, DespeckleBW(imgDebruit, x, y, n, &coeffGauss, sommeGauss))
 			}
 		}
