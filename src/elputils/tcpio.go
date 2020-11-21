@@ -19,6 +19,7 @@ func SendString(conn net.Conn, string string) {
 	// send the string string
 	_, err := io.WriteString(conn, fmt.Sprint(string))
 	if err != nil {
+		fmt.Println("Error - SendString")
 		panic(err)
 	}
 }
@@ -27,6 +28,7 @@ func SendString(conn net.Conn, string string) {
 func ReceiveString(conn net.Conn, delimiter byte) string {
 	message, err := bufio.NewReader(conn).ReadString(delimiter)
 	if err != nil {
+		fmt.Println("Error - ReceiveString")
 		panic(err)
 	}
 	return message
@@ -56,6 +58,8 @@ func UploadFile(conn net.Conn, srcFile string) {
 		fmt.Println(err)
 		return
 	}
+	defer file.Close()
+
 	fileInfo, err := file.Stat()
 	if err != nil {
 		fmt.Println(err)
