@@ -5,9 +5,9 @@ package elputils
 import (
 	"bufio"
 	"fmt"
+	"image/jpeg"
 	"net"
 	"os"
-	"path/filepath"
 	"strconv"
 	"strings"
 )
@@ -26,6 +26,8 @@ func InputString() string {
 // Input filter, client-side
 // Tries again until it succeeds
 func InputFilter(conn net.Conn, filterList []string) int {
+	var num int
+
 	// Display available choices
 	fmt.Println("Available filters :")
 	for i := 0; i < len(filterList); i++ {
@@ -37,14 +39,16 @@ func InputFilter(conn net.Conn, filterList []string) int {
 	// Send and validate filter id
 	SendString(conn, filter)
 	validationServer := ReceiveString(conn, '\n')
-	validFilter := strings.Compare(validationServer[0:1], "1")
+	validFilter := strings.Compare(strings.Trim(validationServer, "\n"), "1")
 
 	if validFilter != 0 {
 		fmt.Println("Invalid choice")
 		// Try again if invalid
-		InputFilter(conn, filterList)
+		num = InputFilter(conn, filterList)
+	} else{
+		num, _ = strconv.Atoi(strings.Trim(filter, "\n"))
 	}
-	num, _ := strconv.Atoi(strings.Trim(filter, "\n"))
+
 	return num
 }
 
@@ -55,6 +59,7 @@ func ReceiveFilter(conn net.Conn, maxFil int) int {
 		filterStr := strings.Trim(ReceiveString(conn, '\n'), "\n")
 		filter, err := strconv.Atoi(filterStr)
 		if err != nil {
+			fmt.Println("Error - Received filter can't be converted into an int")
 			panic(err)
 		}
 
@@ -65,30 +70,47 @@ func ReceiveFilter(conn net.Conn, maxFil int) int {
 			return filter
 		} else {
 			fmt.Printf("Invalid filter : %s\n", filterStr)
-			SendString(conn, "1\n")
+			SendString(conn, "0\n")
 		}
 	}
 
 	return 0
 }
 
+func InputImageVerification(imagePath string) bool {
+	// Filter .jpg images only
+	if !strings.HasSuffix(imagePath, ".jpg") && !strings.HasSuffix(imagePath, ".jpeg") {
+		fmt.Println("Unsupported image format. Use a jpeg image")
+		return false
+	}
+
+	// check if the file can be decoded as jpeg or not
+	input, err := os.Open(imagePath)
+	_, err = jpeg.DecodeConfig(input)
+	if err != nil {
+		fmt.Println("Image has format .jpeg or .jpg but cannot be interpreted as such")
+		return false
+	}
+	input.Close()
+
+	// check if the file exists or not
+	// NB: this is already done by the previous lines (os.Open then jpeg.DecodeConfig)
+	if !FileExists(imagePath) {
+		return false
+	}
+	return true
+}
+
 // Inputs an image path
 func InputImagePath() string {
 	fmt.Print("Relative path to the image ")
 	imagePath := strings.Trim(InputString(), "\n")
-	imagePathAbs, _ := filepath.Abs(imagePath)
 
-	// Filter .jpg images only
-	if !strings.HasSuffix(imagePath, ".jpg") && !strings.HasSuffix(imagePath, ".jpeg") {
-		fmt.Println("Unsupported image format. Use a jpeg image")
-		return InputImagePath()
+	// check the validity of the image path given
+	if !InputImageVerification(imagePath) {
+		imagePath = InputImagePath()
 	}
-	if FileExists(imagePathAbs) {
-		return imagePath
-	}
-	// To it again if it fails
-	fmt.Println("File not found")
-	return InputImagePath()
+	return imagePath
 }
 
 // Check if a file exists in the current directory
