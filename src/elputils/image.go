@@ -8,15 +8,14 @@ import (
 	"image/color"
 	"image/draw"
 	"image/jpeg"
-	"image/png"
 	"math"
 	"os"
 	"sync"
 )
 
-type placedRectangle struct {
+type imageStrip struct {
+	image image.Image
 	rect  image.Rectangle
-	point image.Point
 }
 
 var FilterList = []string{
@@ -31,47 +30,33 @@ var FilterList = []string{
 }
 
 // Appliy a filter asynchronously to a given image, using 4 goroutines
-func ApplyFilterAsync(sourceImg *image.RGBA, filter int) image.Image {
+func ApplyFilterAsync(sourceImg *image.RGBA, filter int, routines int) image.Image {
 
 	width := (*sourceImg).Bounds().Max.X
 	height := (*sourceImg).Bounds().Max.Y
 
 	// Temp images to store results
-	var tmpImages [4]image.Image
+	tmpImages := make([]image.Image, routines)
 
-	// Divide the image in 4 rectangles to speed up computation
-	imagePart := [4]placedRectangle{
-		{
-			rect:  image.Rect(0, 0, width/2, height/2),
-			point: image.Point{},
-		},
-		{
-			rect:  image.Rect(width/2, 0, width, height/2),
-			point: image.Point{X: width / 2},
-		},
-		{
-			rect:  image.Rect(0, height/2, width/2, height),
-			point: image.Point{Y: height / 2},
-		},
-		{
-			rect:  image.Rect(width/2, height/2, width, height),
-			point: image.Point{X: width / 2, Y: height / 2},
-		},
+	// Divide the image in strips to speed up computation
+	imagePart := make([]imageStrip, routines)
+	for i := range imagePart {
+		imagePart[i].rect = image.Rect(i*width/routines, 0, (i+1)*width/routines, height)
 	}
 
 	// Compute transformations in different threads
 	var wg sync.WaitGroup
 	wg.Add(len(imagePart))
 
-	for i, splitImage := range imagePart {
-		go Dispatch(sourceImg, &tmpImages[i], filter, splitImage.rect, &wg)
+	for i := range imagePart {
+		go Dispatch(sourceImg, &tmpImages[i], filter, imagePart[i].rect, &wg)
 	}
 
 	wg.Wait()
 
 	resultImg := image.NewRGBA((*sourceImg).Bounds())
-	for i, splitImage := range imagePart {
-		draw.Draw(resultImg, splitImage.rect, tmpImages[i], splitImage.point, draw.Src)
+	for i := range imagePart {
+		draw.Draw(resultImg, imagePart[i].rect, tmpImages[i], imagePart[i].rect.Min, draw.Src)
 	}
 
 	return resultImg
@@ -85,7 +70,7 @@ func ImageToFile(image image.Image, destination string) {
 		fmt.Println("Couldn't create file", destination)
 	}
 
-	err = png.Encode(output, image)
+	err = jpeg.Encode(output, image, nil)
 	if err != nil {
 		fmt.Println("Couldn't write image to file", destination)
 	}

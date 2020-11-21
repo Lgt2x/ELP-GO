@@ -6,6 +6,7 @@ import (
 	"bufio"
 	"fmt"
 	"io"
+	"log"
 	"net"
 	"os"
 	"strconv"
@@ -99,7 +100,7 @@ func ReceiveFile(conn net.Conn, destination string) {
 	defer newFile.Close()
 	var receivedBytes int64
 
-	fmt.Println("Start receiving")
+	log.Println("Start receiving")
 	for {
 		if (fileSize - receivedBytes) < BufferSize {
 			_, _ = io.CopyN(newFile, conn, fileSize-receivedBytes)
@@ -109,6 +110,6 @@ func ReceiveFile(conn net.Conn, destination string) {
 		_, _ = io.CopyN(newFile, conn, BufferSize)
 		receivedBytes += BufferSize
 	}
-	fmt.Printf("Received %d bytes\n", fileSize)
+	log.Printf("Received %d bytes\n", fileSize)
 
 }
