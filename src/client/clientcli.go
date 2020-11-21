@@ -24,17 +24,17 @@ func main() {
 		sourceImg = os.Args[3]
 		destImg = os.Args[4]
 	} else {
-		fmt.Println("Wrong number of arguments")
+		elputils.PrintRedLn("Wrong number of arguments")
 		usage()
 		os.Exit(1)
 	}
 
 	// Connecting to the server on port
-	fmt.Printf("Connecting to server on port %s", port)
+	fmt.Printf("Connecting to server on port %s\n", port)
 	conn, err := net.Dial("tcp", "localhost"+port)
 
 	if err != nil {
-		fmt.Printf("Couldn't listen on port %s. Is the server running ?\n", port)
+		elputils.PrintRedLn("Couldn't listen on port" + port + ". Is the server running ?")
 		return
 	}
 
@@ -48,8 +48,8 @@ func main() {
 	filterResult := elputils.ReceiveString(conn, '\n')
 
 	// Get an error if the filter can't be found
-	if filterResult == "0" {
-		fmt.Println("Server couldn't apply requested filter. Is the provided id valid ?")
+	if filterResult == "0\n" {
+		elputils.PrintRedLn("Server couldn't apply requested filter. Is the provided id valid ?")
 		os.Exit(1)
 	}
 	fmt.Printf("Selected filter '%s'\n", filterId)
@@ -61,5 +61,5 @@ func main() {
 	// Receiving and storing the modified image
 	fmt.Println("\nWaiting for the modified image...")
 	elputils.ReceiveFile(conn, destImg)
-	fmt.Println("Transformation complete, output stored in ", destImg)
+	elputils.PrintGreenLn("Transformation complete, output stored in " + destImg)
 }

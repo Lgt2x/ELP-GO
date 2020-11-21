@@ -42,10 +42,10 @@ func InputFilter(conn net.Conn, filterList []string) int {
 	validFilter := strings.Compare(strings.Trim(validationServer, "\n"), "1")
 
 	if validFilter != 0 {
-		fmt.Println("Invalid choice")
+		PrintRedLn("Invalid choice")
 		// Try again if invalid
 		num = InputFilter(conn, filterList)
-	} else{
+	} else {
 		num, _ = strconv.Atoi(strings.Trim(filter, "\n"))
 	}
 
@@ -59,7 +59,7 @@ func ReceiveFilter(conn net.Conn, maxFil int) int {
 		filterStr := strings.Trim(ReceiveString(conn, '\n'), "\n")
 		filter, err := strconv.Atoi(filterStr)
 		if err != nil {
-			fmt.Println("Error - Received filter can't be converted into an int")
+			PrintRedLn("Error - Received filter can't be converted into an int")
 			panic(err)
 		}
 
@@ -69,7 +69,7 @@ func ReceiveFilter(conn net.Conn, maxFil int) int {
 			filterValidated = true
 			return filter
 		} else {
-			fmt.Printf("Invalid filter : %s\n", filterStr)
+			PrintRedLn("Invalid filter :" + filterStr)
 			SendString(conn, "0\n")
 		}
 	}
@@ -78,9 +78,9 @@ func ReceiveFilter(conn net.Conn, maxFil int) int {
 }
 
 func InputImageVerification(imagePath string) bool {
-	// Filter .jpg images only
+	// Only jpg images are supported
 	if !strings.HasSuffix(imagePath, ".jpg") && !strings.HasSuffix(imagePath, ".jpeg") {
-		fmt.Println("Unsupported image format. Use a jpeg image")
+		PrintRedLn("Unsupported image format. Use a jpeg image")
 		return false
 	}
 
@@ -88,7 +88,7 @@ func InputImageVerification(imagePath string) bool {
 	input, err := os.Open(imagePath)
 	_, err = jpeg.DecodeConfig(input)
 	if err != nil {
-		fmt.Println("Image has format .jpeg or .jpg but cannot be interpreted as such")
+		PrintRedLn("Can't decode jpeg image")
 		return false
 	}
 	input.Close()
@@ -137,6 +137,17 @@ func FillString(returnString string, toLength int) string {
 func DeleteFile(filename string) {
 	err := os.Remove(filename)
 	if err != nil {
-		fmt.Println("Suppression impossible")
+		PrintRedLn("Suppression impossible")
 	}
+}
+
+// Prints, but in red when something fails
+// Just for fanciness
+func PrintRedLn(output string) {
+	fmt.Printf("\033[91m%s\033[00m\n", output)
+}
+
+// Green too !
+func PrintGreenLn(output string) {
+	fmt.Printf("\033[92m%s\033[00m", output)
 }

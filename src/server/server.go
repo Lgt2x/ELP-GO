@@ -50,11 +50,11 @@ func main() {
 	}
 }
 
-// function to avoid the server to crash if a panic statement is raised due to a client
-func defusePanic(connection net.Conn, connId int){
-	if r := recover(); r!= nil {
+// Function to avoid the server to crash if a panic statement is raised due to a client
+func defusePanic(connId int) {
+	if r := recover(); r != nil {
 		fmt.Println("recovered from ", r)
-		fmt.Println("Panic due to client:", connId)
+		elputils.PrintRedLn("Panic due to client " + strconv.Itoa(connId) + ". Stopping connection.")
 	}
 }
 
@@ -62,7 +62,7 @@ func defusePanic(connection net.Conn, connId int){
 // Client must send a filter id and a image blob
 func handleConnection(connection net.Conn, connId int) {
 	// defusePanic will be executed if there is a panic statement raised
-	defer defusePanic(connection, connId)
+	defer defusePanic(connId)
 
 	fmt.Printf("New connection with a client, id %d\n", connId)
 
