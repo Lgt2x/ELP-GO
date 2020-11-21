@@ -14,6 +14,69 @@ import (
 	"sync"
 )
 
+type placedRectangle struct {
+	rect  image.Rectangle
+	point image.Point
+}
+
+var FilterList = []string{
+	"Negative Black & white",
+	"Negative RGB",
+	"Grey scale",
+	"Uniform Blur",
+	"Gauss Blur",
+	"Noise reduction",
+	"Boundary detection",
+	"Boundaries with Prewitt",
+}
+
+// Appliy a filter asynchronously to a given image, using 4 goroutines
+func ApplyFilterAsync(sourceImg *image.RGBA, filter int) image.Image {
+
+	width := (*sourceImg).Bounds().Max.X
+	height := (*sourceImg).Bounds().Max.Y
+
+	// Temp images to store results
+	var tmpImages [4]image.Image
+
+	// Divide the image in 4 rectangles to speed up computation
+	imagePart := [4]placedRectangle{
+		{
+			rect:  image.Rect(0, 0, width/2, height/2),
+			point: image.Point{},
+		},
+		{
+			rect:  image.Rect(width/2, 0, width, height/2),
+			point: image.Point{X: width / 2},
+		},
+		{
+			rect:  image.Rect(0, height/2, width/2, height),
+			point: image.Point{Y: height / 2},
+		},
+		{
+			rect:  image.Rect(width/2, height/2, width, height),
+			point: image.Point{X: width / 2, Y: height / 2},
+		},
+	}
+
+	// Compute transformations in different threads
+	var wg sync.WaitGroup
+	wg.Add(len(imagePart))
+
+	for i, splitImage := range imagePart {
+		go Dispatch(sourceImg, &tmpImages[i], filter, splitImage.rect, &wg)
+	}
+
+	wg.Wait()
+
+	resultImg := image.NewRGBA((*sourceImg).Bounds())
+	for i, splitImage := range imagePart {
+		draw.Draw(resultImg, splitImage.rect, tmpImages[i], splitImage.point, draw.Src)
+	}
+
+	return resultImg
+}
+
 // Write an image object to a file
 func ImageToFile(image image.Image, destination string) {
 	// Create blank file
@@ -57,50 +120,44 @@ func FileToImage(path string) *image.RGBA {
 }
 
 // Converts image to Black & White
-func GreyScale(img *image.RGBA, res *image.Image, wg *sync.WaitGroup, minX int, minY int, maxX int, maxY int) {
-	imgGrey := image.NewGray(image.Rect(minX, minY, maxX, maxY))
+func GreyScale(img *image.RGBA, res *image.Image, rect image.Rectangle) {
+	imgGrey := image.NewGray(rect)
 
-	for y := minY; y < maxY; y++ {
-		for x := minX; x < maxX; x++ {
+	for y := rect.Min.Y; y <= rect.Max.Y; y++ {
+		for x := rect.Min.X; x <= rect.Max.X; x++ {
 			imgGrey.Set(x, y, (*img).At(x, y))
 		}
 	}
 	*res = imgGrey
-	if wg != nil {
-		wg.Done()
-	}
 }
 
 // Converts image to black & white negative
-func NegativeBW(img *image.RGBA, res *image.Image, wg *sync.WaitGroup, minX int, minY int, maxX int, maxY int) {
+func NegativeBW(img *image.RGBA, res *image.Image, rect image.Rectangle) {
 	var imgGris image.Image
-	GreyScale(img, &imgGris, nil, minX, minY, maxX, maxY)
-	imgNeg := image.NewGray(image.Rect(minX, minY, maxX, maxY))
-	for y := minY; y < maxY; y++ {
-		for x := minX; x < maxX; x++ {
+	GreyScale(img, &imgGris, rect)
+	imgNeg := image.NewGray(rect)
+	for y := rect.Min.Y; y <= rect.Max.Y; y++ {
+		for x := rect.Min.X; x <= rect.Max.X; x++ {
 			z, _, _, _ := imgGris.At(x, y).RGBA()
 			pix := color.Gray{Y: 255 - uint8(z)}
 			imgNeg.Set(x, y, pix)
 		}
 	}
 	*res = imgNeg
-	if wg != nil {
-		wg.Done()
-	}
 }
 
 // Negative (RGB)
-func NegativeRGB(img *image.RGBA, res *image.Image, wg *sync.WaitGroup, minX int, minY int, maxX int, maxY int) {
-	imgNeg := image.NewRGBA(image.Rect(minX, minY, maxX, maxY))
-	for y := minY; y < maxY; y++ {
-		for x := minX; x < maxX; x++ {
+func NegativeRGB(img *image.RGBA, res *image.Image, rect image.Rectangle) {
+	imgNeg := image.NewRGBA(rect)
+	for y := rect.Min.Y; y <= rect.Max.Y; y++ {
+		for x := rect.Min.X; x <= rect.Max.X; x++ {
 			r, v, b, _ := (*img).At(x, y).RGBA()
 			pix := color.RGBA{R: 255 - uint8(r/256), G: 255 - uint8(v/256), B: 255 - uint8(b/256), A: 0xff}
 			imgNeg.Set(x, y, pix)
 		}
 	}
 	*res = imgNeg
-	wg.Done()
+
 }
 
 // Filter using a 3x3 convolution matrix
@@ -162,65 +219,64 @@ func ConvolutionGauss(x int, y int, img *image.RGBA, n int, coeff *[][]float64, 
 	return pix
 }
 
-func GaussBlur(img *image.RGBA, res *image.Image, n int, wg *sync.WaitGroup, minX int, minY int, maxX int, maxY int) { //flou de gauss avec matrice de taille n (plus n est grand plus l'effet est important), peut-etre faire plusieurs itérations
-	imgFlou := image.NewRGBA(image.Rect(minX, minY, maxX, maxY))
+func GaussBlur(img *image.RGBA, res *image.Image, n int, rect image.Rectangle) { //flou de gauss avec matrice de taille n (plus n est grand plus l'effet est important), peut-etre faire plusieurs itérations
+	imgFlou := image.NewRGBA(rect)
 	coeff, somme := GaussMatrix(n)
 
-	for y := minY; y < maxY; y++ {
-		for x := minX; x < maxX; x++ {
+	for y := rect.Min.Y; y <= rect.Max.Y; y++ {
+		for x := rect.Min.X; x <= rect.Max.X; x++ {
 			imgFlou.Set(x, y, ConvolutionGauss(x, y, img, n, &coeff, somme))
 		}
 	}
 
 	*res = imgFlou
-	wg.Done()
+
 }
 
-func UniformBlur(img *image.RGBA, res *image.Image, wg *sync.WaitGroup, minX int, minY int, maxX int, maxY int) { //applique un filtre uniforme 3x3 à chaque pixel
+func UniformBlur(img *image.RGBA, res *image.Image, rect image.Rectangle) { //applique un filtre uniforme 3x3 à chaque pixel
 	imgFlou := image.NewRGBA((*img).Bounds())
 	coeff := [3][3]float64{{1, 1, 1}, {1, 1, 1}, {1, 1, 1}}
 	somme := 9.0
-	for y := minY; y < maxY; y++ {
-		for x := minX; x < maxX; x++ {
+	for y := rect.Min.Y; y <= rect.Max.Y; y++ {
+		for x := rect.Min.X; x <= rect.Max.X; x++ {
 			imgFlou.Set(x, y, Convolution(x, y, img, &coeff, somme))
 		}
 	}
 
 	*res = imgFlou
-	wg.Done()
+
 }
 
-func Boundaries(img *image.RGBA, res *image.Image, puissance int, wg *sync.WaitGroup, minX int, minY int, maxX int, maxY int) { //filtre laplacien : fonctionne mieux, utiliser un autre filtre? sobel, prewitt...
-	imgCont := image.NewRGBA(image.Rect(minX, minY, maxX, maxY))
+func Boundaries(img *image.RGBA, res *image.Image, puissance int, rect image.Rectangle) { //filtre laplacien : fonctionne mieux, utiliser un autre filtre? sobel, prewitt...
+	imgCont := image.NewRGBA(rect)
 	coeff := [3][3]float64{{-1, -1, -1}, {-1, 8, -1}, {-1, -1, -1}} //laplacien
 	//coeff := [3][3]float64{{-2,-2,0},{-2,0,2},{0,2,2}} //sobel
 	somme := float64(puissance) //pose problème entre nv détails , et efficacité ==> eventuellement le proposer en réglage à l'utilisateur
-	for y := minY; y < maxY; y++ {
-		for x := minX; x < maxX; x++ {
+	for y := rect.Min.Y; y <= rect.Max.Y; y++ {
+		for x := rect.Min.X; x <= rect.Max.X; x++ {
 			imgCont.Set(x, y, Convolution(x, y, img, &coeff, somme))
 		}
 	}
-	NegativeBW(imgCont, res, nil, minX, minY, maxX, maxY)
-	wg.Done()
+	NegativeBW(imgCont, res, rect)
 }
 
-func PrewittBorders(img *image.RGBA, res *image.Image, puissance int, wg *sync.WaitGroup, minX int, minY int, maxX int, maxY int) { //filtre prewitt
-	imgCont0 := image.NewRGBA(image.Rect(minX, minY, maxX, maxY))
-	imgCont90 := image.NewRGBA(image.Rect(minX, minY, maxX, maxY))
-	imgRes := image.NewRGBA(image.Rect(minX, minY, maxX, maxY))
+func PrewittBorders(img *image.RGBA, res *image.Image, puissance int, rect image.Rectangle) { //filtre prewitt
+	imgCont0 := image.NewRGBA(rect)
+	imgCont90 := image.NewRGBA(rect)
+	imgRes := image.NewRGBA(rect)
 
 	coeff1 := [3][3]float64{{-1, -1, -1}, {-1, 8, -1}, {-1, -1, -1}} //Prewitt 0°
 	coeff2 := [3][3]float64{{-2, -2, 0}, {-2, 0, 2}, {0, 2, 2}}      //Prewitt 90°
 
 	somme := float64(puissance) //pose problème entre nv détails , et efficacité ==> eventuellement le proposer en réglage à l'utilisateur
-	for y := img.Bounds().Min.Y + 1; y < img.Bounds().Max.Y-1; y++ {
-		for x := img.Bounds().Min.X + 1; x < img.Bounds().Max.X-1; x++ {
+	for y := img.Bounds().Min.Y + 1; y <= img.Bounds().Max.Y-1; y++ {
+		for x := img.Bounds().Min.X + 1; x <= img.Bounds().Max.X-1; x++ {
 			imgCont0.Set(x, y, Convolution(x, y, img, &coeff1, somme))
 		}
 	}
 
-	for y := img.Bounds().Min.Y + 1; y < img.Bounds().Max.Y-1; y++ {
-		for x := img.Bounds().Min.X + 1; x < img.Bounds().Max.X-1; x++ {
+	for y := img.Bounds().Min.Y + 1; y <= img.Bounds().Max.Y-1; y++ {
+		for x := img.Bounds().Min.X + 1; x <= img.Bounds().Max.X-1; x++ {
 			imgCont90.Set(x, y, Convolution(x, y, img, &coeff2, somme))
 		}
 	}
@@ -232,8 +288,8 @@ func PrewittBorders(img *image.RGBA, res *image.Image, puissance int, wg *sync.W
 		}
 	}
 
-	NegativeBW(imgRes, res, nil, minX, minY, maxX, maxY) //applique le filtre négatif pour que ça soit "plus joli"
-	wg.Done()
+	NegativeBW(imgRes, res, rect) //applique le filtre négatif pour que ça soit "plus joli"
+
 }
 
 func DespeckleBW(img *image.RGBA, x int, y int, n int, coeffGauss *[][]float64, sommeGauss float64) color.Gray { //réduction de bruit Noir et Blanc : fonctionnel
@@ -277,121 +333,57 @@ func DespeckleBW(img *image.RGBA, x int, y int, n int, coeffGauss *[][]float64, 
 
 }
 
-func NoiseReductionBW(img *image.RGBA, res *image.Image, nbIterations int, n int, wg *sync.WaitGroup, minX int, minY int, maxX int, maxY int) {
-	imgDebruit := image.NewRGBA(image.Rect(minX, minY, maxX, maxY))
+func NoiseReductionBW(img *image.RGBA, res *image.Image, nbIterations int, n int, rect image.Rectangle) {
+	imgDebruit := image.NewRGBA(rect)
 	coeffGauss, sommeGauss := GaussMatrix(3)
 
-	for y := minY; y < maxY; y++ {
-		for x := minX; x < maxX; x++ {
+	for y := rect.Min.Y; y <= rect.Max.Y; y++ {
+		for x := rect.Min.X; x <= rect.Max.X; x++ {
 			imgDebruit.Set(x, y, DespeckleBW(img, x, y, n, &coeffGauss, sommeGauss))
 		}
 	}
 
 	for k := 0; k < nbIterations-1; k++ {
-		for y := imgDebruit.Bounds().Min.Y + n/2; y < imgDebruit.Bounds().Max.Y-n/2; y++ {
-			for x := imgDebruit.Bounds().Min.X + n/2; x < imgDebruit.Bounds().Max.X-n/2; x++ {
+		for y := imgDebruit.Bounds().Min.Y + n/2; y <= imgDebruit.Bounds().Max.Y-n/2; y++ {
+			for x := imgDebruit.Bounds().Min.X + n/2; x <= imgDebruit.Bounds().Max.X-n/2; x++ {
 				imgDebruit.Set(x, y, DespeckleBW(imgDebruit, x, y, n, &coeffGauss, sommeGauss))
 			}
 		}
 	}
 
 	*res = imgDebruit
-	wg.Done()
+
 }
 
-var FilterList = []string{
-	"Negative Black & white",
-	"Negative RGB",
-	"Grey scale",
-	"Uniform Blur",
-	"Gauss Blur",
-	"Noise reduction",
-	"Boundary detection",
-	"Boundaries with Prewitt",
-}
-
-func Dispatch(img *image.RGBA, n int) image.Image { //permet de sélectionner quelle transfo en fonction de l'entrée utilisateur du programme principal
-	//variable param pour les traitement nécessitant un niveau de puissance selectionné par l'utilisateur
-	var img1, img2, img3, img4 image.Image
-
-	imgRes := image.NewRGBA((*img).Bounds())
-	var wg sync.WaitGroup
-	imgp1, imgp2, imgp3, imgp4 := &img1, &img2, &img3, &img4
-
-	maxX := (*img).Bounds().Max.X
-	maxY := (*img).Bounds().Max.Y
-
-	wg.Add(4)
-
-	switch n {
-
+// Apply a filter to a source image following a filter id
+// Filter id <=> filter matching follows the order defined in filterList
+func Dispatch(source *image.RGBA, dest *image.Image, filter int, rect image.Rectangle, wg *sync.WaitGroup) {
+	switch filter {
 	case 1:
-		go NegativeBW(img, imgp1, &wg, 0, 0, maxX/2, maxY/2)
-		go NegativeBW(img, imgp2, &wg, maxX/2, 0, maxX+1, maxY/2)
-		go NegativeBW(img, imgp3, &wg, 0, maxY/2, maxX/2, maxY+1)
-		go NegativeBW(img, imgp4, &wg, maxX/2, maxY/2, maxX+1, maxY+1)
+		NegativeBW(source, dest, rect)
 		break
-
 	case 2:
-		go NegativeRGB(img, imgp1, &wg, 0, 0, maxX/2, maxY/2)
-		go NegativeRGB(img, imgp2, &wg, maxX/2, 0, maxX+1, maxY/2)
-		go NegativeRGB(img, imgp3, &wg, 0, maxY/2, maxX/2, maxY+1)
-		go NegativeRGB(img, imgp4, &wg, maxX/2, maxY/2, maxX+1, maxY+1)
+		NegativeRGB(source, dest, rect)
 		break
-
 	case 3:
-		go GreyScale(img, imgp1, &wg, 0, 0, maxX/2, maxY/2)
-		go GreyScale(img, imgp2, &wg, maxX/2, 0, maxX+1, maxY/2)
-		go GreyScale(img, imgp3, &wg, 0, maxY/2, maxX/2, maxY+1)
-		go GreyScale(img, imgp4, &wg, maxX/2, maxY/2, maxX+1, maxY+1)
+		GreyScale(source, dest, rect)
 		break
-
 	case 4:
-		go UniformBlur(img, imgp1, &wg, 2, 2, maxX/2, maxY/2)
-		go UniformBlur(img, imgp2, &wg, maxX/2, 2, maxX-2, maxY/2)
-		go UniformBlur(img, imgp3, &wg, 2, maxY/2, maxX/2, maxY-2)
-		go UniformBlur(img, imgp4, &wg, maxX/2, maxY/2, maxX-2, maxY-2)
+		UniformBlur(source, dest, rect)
 		break
-
 	case 5:
-		go GaussBlur(img, imgp1, 7, &wg, 2, 2, maxX/2, maxY/2) //param1=taille matrice /!\ nb impairs= puissance du flou en fct de la résolution et de l'envie de l'utilisateur
-		go GaussBlur(img, imgp2, 7, &wg, maxX/2, 2, maxX-2, maxY/2)
-		go GaussBlur(img, imgp3, 7, &wg, 2, maxY/2, maxX/2, maxY-2)
-		go GaussBlur(img, imgp4, 7, &wg, maxX/2, maxY/2, maxX-2, maxY-2) //param1=taille matrice /!\ nb impairs= puissance du flou en fct de la résolution et de l'envie de l'utilisateur
+		GaussBlur(source, dest, 7, rect)
 		break
-
 	case 6:
-		go NoiseReductionBW(img, imgp1, 2, 5, &wg, 1, 1, maxX/2, maxY/2)
-		go NoiseReductionBW(img, imgp2, 2, 5, &wg, maxX/2, 1, maxX-1, maxY/2)
-		go NoiseReductionBW(img, imgp3, 2, 5, &wg, 1, maxY/2, maxX/2, maxY-1)
-		go NoiseReductionBW(img, imgp4, 2, 5, &wg, maxX/2, maxY/2, maxX-1, maxY-1)
-		//param1 = nbIteration du filtre 1 à 2 conseillé
-		//param2 = taille matrice 5 conseillé (nombres impairs /!\)
+		NoiseReductionBW(source, dest, 2, 5, rect)
 		break
-
 	case 7:
-		//param1 = puissance de séparation en paramètre 8 voire 16, plus c'est élevé plus seuls les "gros" Boundaries seront visibles
-		go Boundaries(img, imgp1, 8, &wg, 0, 0, maxX/2, maxY/2)
-		go Boundaries(img, imgp2, 8, &wg, maxX/2, 0, maxX+1, maxY/2)
-		go Boundaries(img, imgp3, 8, &wg, 0, maxY/2, maxX/2, maxY+1)
-		go Boundaries(img, imgp4, 8, &wg, maxX/2, maxY/2, maxX+1, maxY+1)
-
-		break //attention : il faut rajouter le filtre NegativeBW !!
-
-	case 8:
-		go PrewittBorders(img, imgp1, 32, &wg, 0, 0, maxX/2, maxY/2)
-		go PrewittBorders(img, imgp2, 32, &wg, maxX/2, 0, maxX+1, maxY/2)
-		go PrewittBorders(img, imgp3, 32, &wg, 0, maxY/2, maxX/2, maxY+1)
-		go PrewittBorders(img, imgp4, 32, &wg, maxX/2, maxY/2, maxX+1, maxY+1) //pareil que Boundaries mais utilise le filtre de Prewitt à la place
+		Boundaries(source, dest, 8, rect)
 		break
-
+	case 8:
+		PrewittBorders(source, dest, 32, rect)
+		break
 	}
-	wg.Wait()
 
-	draw.Draw(imgRes, image.Rect(0, 0, maxX/2, maxY/2), img1, image.Point{}, draw.Src)
-	draw.Draw(imgRes, image.Rect(maxX/2, 0, maxX, maxY/2), img2, image.Point{X: maxX / 2}, draw.Src)
-	draw.Draw(imgRes, image.Rect(0, maxY/2, maxX/2, maxY), img3, image.Point{Y: maxY / 2}, draw.Src)
-	draw.Draw(imgRes, image.Rect(maxX/2, maxY/2, maxX, maxY), img4, image.Point{X: maxX / 2, Y: maxY / 2}, draw.Src)
-
-	return imgRes
+	wg.Done()
 }
