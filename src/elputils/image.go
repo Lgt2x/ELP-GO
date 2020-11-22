@@ -13,7 +13,6 @@ import (
 	"sync"
 )
 
-
 //list of all available filters
 var FilterList = []string{
 	"Negative Black & white",
@@ -122,7 +121,6 @@ func NegativeBW(img *image.RGBA, res *image.RGBA, rect image.Rectangle) {
 	draw.Draw(res, rect, imgNeg, rect.Min, draw.Src)
 }
 
-
 // Reverses each component of each pixel of the image considered
 func NegativeRGB(img *image.RGBA, res *image.RGBA, rect image.Rectangle) {
 	imgNeg := image.NewRGBA(rect)
@@ -211,7 +209,6 @@ func UniformBlur(img *image.RGBA, res *image.RGBA, rect image.Rectangle) {
 
 }
 
-
 //Boundaries detection using a Laplacian filter
 //we apply a 3x3 convolution matrix on the source image which determines changes of gradient intensity
 func Boundaries(img *image.RGBA, res *image.RGBA, puissance int, rect image.Rectangle) {
@@ -227,7 +224,6 @@ func Boundaries(img *image.RGBA, res *image.RGBA, puissance int, rect image.Rect
 	draw.Draw(res, rect, imgCont, rect.Min, draw.Src)
 	NegativeBW(res, res, rect) //applies a negative filter in order to be "prettier"
 }
-
 
 //Boundaries detection using the Prewitt filter
 //we apply 2 3x3 convolution matrices in two different directions (0° and 90°) on the source image and then we combine these two new images
@@ -311,7 +307,6 @@ func DespeckleBW(img *image.RGBA, x int, y int, n int, coeffGauss *[][]float64, 
 
 }
 
-
 //This function applies DespeckleBW on each pixel of the image 2 times in order to have great results
 func NoiseReductionBW(img *image.RGBA, res *image.RGBA, nbIterations int, n int, rect image.Rectangle) {
 	imgDebruit := image.NewRGBA(rect)
@@ -358,7 +353,7 @@ func Dispatch(source *image.RGBA, dest *image.RGBA, filter int, rect image.Recta
 		NoiseReductionBW(source, dest, 2, 5, rect)
 		break
 	case 7:
-		Boundaries(source, dest, 8, rect)
+		Boundaries(source, dest, 32, rect)
 		break
 	case 8:
 		PrewittBorders(source, dest, 32, rect) //à vérifier niveau de puissance selon image
