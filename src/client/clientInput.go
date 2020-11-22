@@ -22,7 +22,7 @@ func main() {
 	conn, err := net.Dial("tcp", "localhost:"+PORT)
 
 	if err != nil {
-		fmt.Printf("Couldn't listen on port %s. Is the server running ?\n", PORT)
+		elputils.PrintRedLn("Couldn't listen on port" + PORT + ". Is the server running ?\n")
 		return
 	}
 
@@ -49,5 +49,5 @@ func main() {
 	// Receiving the modified image
 	fmt.Println("\nWaiting for the modified image...")
 	elputils.ReceiveFile(conn, outputFile)
-	fmt.Println("Transformation complete, output stored in ", outputFile)
+	elputils.PrintGreenLn("Transformation complete, output stored in " + outputFile)
 }
