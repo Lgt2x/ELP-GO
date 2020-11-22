@@ -13,10 +13,6 @@ import (
 	"sync"
 )
 
-type imageStrip struct {
-	image image.Image
-	rect  image.Rectangle
-}
 
 //list of all available filters
 var FilterList = []string{
@@ -35,30 +31,23 @@ func ApplyFilterAsync(sourceImg *image.RGBA, filter int, routines int) image.Ima
 
 	width := (*sourceImg).Bounds().Max.X
 	height := (*sourceImg).Bounds().Max.Y
-
-	// Temp images to store results
-	tmpImages := make([]image.Image, routines)
+	resultImg := image.NewRGBA((*sourceImg).Bounds())
 
 	// Divide the image in strips to speed up computation
-	imagePart := make([]imageStrip, routines)
-	for i := range imagePart {
-		imagePart[i].rect = image.Rect(i*width/routines, 0, (i+1)*width/routines, height)
+	imagePart := make([]image.Rectangle, routines)
+	for i := 0; i < len(imagePart); i++ {
+		imagePart[i] = image.Rect(i*width/routines, 0, (i+1)*width/routines, height)
 	}
 
 	// Compute transformations in different threads
 	var wg sync.WaitGroup
 	wg.Add(len(imagePart))
 
-	for i := range imagePart {
-		go Dispatch(sourceImg, &tmpImages[i], filter, imagePart[i].rect, &wg)
+	for i := 0; i < len(imagePart); i++ {
+		go Dispatch(sourceImg, resultImg, filter, imagePart[i], &wg)
 	}
 
 	wg.Wait()
-
-	resultImg := image.NewRGBA((*sourceImg).Bounds())
-	for i := range imagePart {
-		draw.Draw(resultImg, imagePart[i].rect, tmpImages[i], imagePart[i].rect.Min, draw.Src)
-	}
 
 	return resultImg
 }
@@ -106,7 +95,7 @@ func FileToImage(path string) *image.RGBA {
 }
 
 // Converts image to grayscale
-func GreyScale(img *image.RGBA, res *image.Image, rect image.Rectangle) {
+func GreyScale(img *image.RGBA, res *image.RGBA, rect image.Rectangle) {
 	imgGrey := image.NewGray(rect)
 
 	for y := rect.Min.Y; y <= rect.Max.Y; y++ {
@@ -114,26 +103,28 @@ func GreyScale(img *image.RGBA, res *image.Image, rect image.Rectangle) {
 			imgGrey.Set(x, y, (*img).At(x, y))
 		}
 	}
-	*res = imgGrey
+	draw.Draw(res, rect, imgGrey, rect.Min, draw.Src)
 }
 
 // Converts image to black & white negative
-func NegativeBW(img *image.RGBA, res *image.Image, rect image.Rectangle) {
-	var imgGris image.Image
-	GreyScale(img, &imgGris, rect) //first we need to convert the image in grayscale
+
+func NegativeBW(img *image.RGBA, res *image.RGBA, rect image.Rectangle) {
+	GreyScale(img, res, rect) //first we need to convert the image in grayscale
 	imgNeg := image.NewGray(rect)
 	for y := rect.Min.Y; y <= rect.Max.Y; y++ {
 		for x := rect.Min.X; x <= rect.Max.X; x++ {
-			z, _, _, _ := imgGris.At(x, y).RGBA()
+			z, _, _, _ := res.At(x, y).RGBA()
 			pix := color.Gray{Y: 255 - uint8(z)}
 			imgNeg.Set(x, y, pix)
 		}
 	}
-	*res = imgNeg
+
+	draw.Draw(res, rect, imgNeg, rect.Min, draw.Src)
 }
 
+
 // Reverses each component of each pixel of the image considered
-func NegativeRGB(img *image.RGBA, res *image.Image, rect image.Rectangle) {
+func NegativeRGB(img *image.RGBA, res *image.RGBA, rect image.Rectangle) {
 	imgNeg := image.NewRGBA(rect)
 	for y := rect.Min.Y; y <= rect.Max.Y; y++ {
 		for x := rect.Min.X; x <= rect.Max.X; x++ {
@@ -142,7 +133,8 @@ func NegativeRGB(img *image.RGBA, res *image.Image, rect image.Rectangle) {
 			imgNeg.Set(x, y, pix)
 		}
 	}
-	*res = imgNeg
+
+	draw.Draw(res, rect, imgNeg, rect.Min, draw.Src)
 
 }
 
@@ -190,7 +182,7 @@ func Convolution(x int, y int, img *image.RGBA, n int, coeff *[][]float64, somme
 
 //applies a gaussian blur using a NxN convolution matrix (more N is higher, more the blurry effect is important)
 //If the image is very big, it can be necessary to apply this filter several times
-func GaussBlur(img *image.RGBA, res *image.Image, n int, rect image.Rectangle) {
+func GaussBlur(img *image.RGBA, res *image.RGBA, n int, rect image.Rectangle) {
 	imgFlou := image.NewRGBA(rect)
 	coeff, somme := GaussMatrix(n)
 
@@ -200,12 +192,12 @@ func GaussBlur(img *image.RGBA, res *image.Image, n int, rect image.Rectangle) {
 		}
 	}
 
-	*res = imgFlou
+	draw.Draw(res, rect, imgFlou, rect.Min, draw.Src)
 
 }
 
 //applies an uniform blur on each pixel using a 3x3 convolution matrix
-func UniformBlur(img *image.RGBA, res *image.Image, rect image.Rectangle) {
+func UniformBlur(img *image.RGBA, res *image.RGBA, rect image.Rectangle) {
 	imgFlou := image.NewRGBA((*img).Bounds())
 	coeff := [][]float64{{1, 1, 1}, {1, 1, 1}, {1, 1, 1}}
 	somme := 9.0
@@ -215,13 +207,14 @@ func UniformBlur(img *image.RGBA, res *image.Image, rect image.Rectangle) {
 		}
 	}
 
-	*res = imgFlou
+	draw.Draw(res, rect, imgFlou, rect.Min, draw.Src)
 
 }
 
+
 //Boundaries detection using a Laplacian filter
 //we apply a 3x3 convolution matrix on the source image which determines changes of gradient intensity
-func Boundaries(img *image.RGBA, res *image.Image, puissance int, rect image.Rectangle) {
+func Boundaries(img *image.RGBA, res *image.RGBA, puissance int, rect image.Rectangle) {
 	imgCont := image.NewRGBA(rect)
 	coeff := [][]float64{{-1, -1, -1}, {-1, 8, -1}, {-1, -1, -1}} //laplacien
 	somme := float64(puissance)                                   //This value influences the power of the filter (lower it is, better is the boundaries detection but can create a lot of noise)
@@ -230,12 +223,15 @@ func Boundaries(img *image.RGBA, res *image.Image, puissance int, rect image.Rec
 			imgCont.Set(x, y, Convolution(x, y, img, 3, &coeff, somme))
 		}
 	}
-	NegativeBW(imgCont, res, rect) //applies a negative filter in order to be "prettier"
+
+	draw.Draw(res, rect, imgCont, rect.Min, draw.Src)
+	NegativeBW(res, res, rect) //applies a negative filter in order to be "prettier"
 }
+
 
 //Boundaries detection using the Prewitt filter
 //we apply 2 3x3 convolution matrices in two different directions (0° and 90°) on the source image and then we combine these two new images
-func PrewittBorders(img *image.RGBA, res *image.Image, puissance int, rect image.Rectangle) {
+func PrewittBorders(img *image.RGBA, res *image.RGBA, puissance int, rect image.Rectangle) {
 	imgCont0 := image.NewRGBA(rect)
 	imgCont90 := image.NewRGBA(rect)
 	imgRes := image.NewRGBA(rect)
@@ -315,8 +311,9 @@ func DespeckleBW(img *image.RGBA, x int, y int, n int, coeffGauss *[][]float64, 
 
 }
 
+
 //This function applies DespeckleBW on each pixel of the image 2 times in order to have great results
-func NoiseReductionBW(img *image.RGBA, res *image.Image, nbIterations int, n int, rect image.Rectangle) {
+func NoiseReductionBW(img *image.RGBA, res *image.RGBA, nbIterations int, n int, rect image.Rectangle) {
 	imgDebruit := image.NewRGBA(rect)
 	coeffGauss, sommeGauss := GaussMatrix(3)
 
@@ -334,13 +331,13 @@ func NoiseReductionBW(img *image.RGBA, res *image.Image, nbIterations int, n int
 		}
 	}
 
-	*res = imgDebruit
+	draw.Draw(res, rect, imgDebruit, rect.Min, draw.Src)
 
 }
 
 // Apply a filter to a source image following a filter id
 // Filter id <=> filter matching follows the order defined in filterList
-func Dispatch(source *image.RGBA, dest *image.Image, filter int, rect image.Rectangle, wg *sync.WaitGroup) {
+func Dispatch(source *image.RGBA, dest *image.RGBA, filter int, rect image.Rectangle, wg *sync.WaitGroup) {
 	switch filter {
 	case 1:
 		NegativeBW(source, dest, rect)
