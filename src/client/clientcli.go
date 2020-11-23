@@ -43,7 +43,7 @@ func main() {
 	defer conn.Close()
 
 	// Send filter
-	_ = elputils.ReceiveArray(conn, ";", '\n') // Ignore filter list sent
+	_ = elputils.ReceiveArray(conn, ";", '\n') // Ignore filter list sent, not used for CLI
 	elputils.SendString(conn, filterId+"\n")
 	filterResult := elputils.ReceiveString(conn, '\n')
 
@@ -55,6 +55,10 @@ func main() {
 	fmt.Printf("Selected filter '%s'\n", filterId)
 
 	// Send file
+	if !elputils.InputImageVerification(sourceImg) {
+		elputils.PrintRedLn("Couldn't find jpeg image " + sourceImg + ". Is the specified location correct ?")
+		os.Exit(1)
+	}
 	fmt.Println("Sending image", sourceImg)
 	elputils.UploadFile(conn, sourceImg)
 

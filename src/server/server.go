@@ -13,18 +13,21 @@ func main() {
 
 	var PORT string
 	var ROUTINES int64
+
 	if len(os.Args) == 3 {
 		PORT = os.Args[1]
 		ROUTINES, _ = strconv.ParseInt(os.Args[2], 10, 32)
 	} else {
+		log.Println("No parameters provided, using default server config")
+		log.Println("Usage : server <port> <routines/img>")
 		PORT = "8000"
 		ROUTINES = 4
 	}
-	// Create temp dir for files
-	_ = os.Mkdir("tmp", 0755)
-	//defer os.RemoveAll("tmp")
 
-	// Listen on TCP port PORT
+	// Create temp dir for files
+	_ = os.Mkdir("/tmp/ELP_GO", 0755)
+
+	// Listen on TCP port
 	ln, err := net.Listen("tcp", ":"+PORT)
 
 	if err != nil {
@@ -81,20 +84,19 @@ func handleConnection(connection net.Conn, connId int, routines int) {
 
 	// Receive image blob and store it in a temp file
 	log.Println("Receiving image...")
-	og_name := "tmp/og_" + strconv.Itoa(connId) + ".jpg"
-	modif_name := "tmp/modif_" + strconv.Itoa(connId) + ".jpg"
-	elputils.ReceiveFile(connection, og_name)
+	ogName := "/tmp/ELP_GO/og_" + strconv.Itoa(connId) + ".jpg"
+	modifiedName := "/tmp/ELP_GO/modified_" + strconv.Itoa(connId) + ".jpg"
+	elputils.ReceiveFile(connection, ogName)
 
 	// Apply filter
 	log.Println("Applying filter")
-	imageTest := elputils.FileToImage(og_name)
+	imageTest := elputils.FileToImage(ogName)
 	convert := elputils.ApplyFilterAsync(imageTest, filter, routines)
-	elputils.ImageToFile(convert, modif_name)
-	//fileModified := "img_modif.jpg"
+	elputils.ImageToFile(convert, modifiedName)
 
 	// Send back the file
 	log.Printf("Sending back the modified image\n")
-	elputils.UploadFile(connection, modif_name)
+	elputils.UploadFile(connection, modifiedName)
 
 	elapsed := time.Since(start)
 	log.Printf("Image took %s to process", elapsed)
@@ -104,6 +106,6 @@ func handleConnection(connection net.Conn, connId int, routines int) {
 	connection.Close()
 
 	// Delete temp files
-	elputils.DeleteFile(og_name)
-	elputils.DeleteFile(modif_name)
+	elputils.DeleteFile(ogName)
+	elputils.DeleteFile(modifiedName)
 }
