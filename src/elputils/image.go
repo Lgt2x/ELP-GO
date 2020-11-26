@@ -143,15 +143,14 @@ func GaussMatrix(n int) ([][]float64, float64) {
 		coeff[i] = make([]float64, n)
 	}
 	var somme float64
-	et := 0.75 //standard deviation used there
+	et := 15.0 //standard deviation used there
 
 	for x := -n / 2; x <= n/2; x++ {
 		for y := -n / 2; y <= n/2; y++ {
-			coeff[x+n/2][y+n/2] = 100 * math.Exp(-(math.Pow(float64(x), 2)+math.Pow(float64(y), 2))/2*math.Pow(et, 2)) / (2 * math.Pi * math.Pow(et, 2))
+			coeff[x+n/2][y+n/2] = math.Exp(-(math.Pow(float64(x), 2)+math.Pow(float64(y), 2))/(2.0*math.Pow(et, 2))) / (2.0 * math.Pi * math.Pow(et, 2))
 			somme += coeff[x+n/2][y+n/2]
 		}
 	}
-
 	return coeff, somme
 }
 
@@ -178,8 +177,8 @@ func Convolution(x int, y int, img *image.RGBA, n int, coeff *[][]float64, somme
 	return pix
 }
 
-//applies a gaussian blur using a NxN convolution matrix (more N is higher, more the blurry effect is important)
-//If the image is very big, it can be necessary to apply this filter several times
+//applies a gaussian blur using a NxN convolution matrix (more N is higher or standard deviation higher, more the blurry effect is important)
+//If the image is very big, it can be necessary to strongly increase N (stdev can also be increased)
 func GaussBlur(img *image.RGBA, res *image.RGBA, n int, rect image.Rectangle) {
 	imgFlou := image.NewRGBA(rect)
 	coeff, somme := GaussMatrix(n)
@@ -213,8 +212,8 @@ func UniformBlur(img *image.RGBA, res *image.RGBA, rect image.Rectangle) {
 //we apply a 3x3 convolution matrix on the source image which determines changes of gradient intensity
 func Boundaries(img *image.RGBA, res *image.RGBA, puissance int, rect image.Rectangle) {
 	imgCont := image.NewRGBA(rect)
-	coeff := [][]float64{{-1, -1, -1}, {-1, 8, -1}, {-1, -1, -1}} //laplacien
-	somme := float64(puissance)                                   //This value influences the power of the filter (lower it is, better is the boundaries detection but can create a lot of noise)
+	coeff := [][]float64{{1, 1, 1}, {1, -8, 1}, {1, 1, 1}} //laplacien
+	somme := float64(puissance)                            //This value influences the power of the filter (lower it is, better is the boundaries detection but can create a lot of noise)
 	for y := rect.Min.Y; y <= rect.Max.Y; y++ {
 		for x := rect.Min.X; x <= rect.Max.X; x++ {
 			imgCont.Set(x, y, Convolution(x, y, img, 3, &coeff, somme))
@@ -232,8 +231,8 @@ func PrewittBorders(img *image.RGBA, res *image.RGBA, puissance int, rect image.
 	imgCont90 := image.NewRGBA(rect)
 	imgRes := image.NewRGBA(rect)
 
-	coeff1 := [][]float64{{-1, -1, -1}, {-1, 8, -1}, {-1, -1, -1}} //Prewitt 0°
-	coeff2 := [][]float64{{-2, -2, 0}, {-2, 0, 2}, {0, 2, 2}}      //Prewitt 90°
+	coeff1 := [][]float64{{-1, 0, +1}, {-1, 0, +1}, {-1, 0, +1}} //Prewitt 0°
+	coeff2 := [][]float64{{-1, -1, -1}, {0, 0, 0}, {1, 1, 1}}    //Prewitt 90°
 
 	somme := float64(puissance) //This value influences the power of the filter (lower it is, better is the boundaries detection but can create a lot of noise)
 
@@ -258,9 +257,8 @@ func PrewittBorders(img *image.RGBA, res *image.RGBA, puissance int, rect image.
 			imgRes.Set(x, y, color.Gray{Y: pix})
 		}
 	}
-
-	NegativeBW(imgRes, res, rect) //applies a negative filter in order to be "prettier"
-
+	//NegativeBW(imgRes, res, rect) //applies a negative filter in order to be "prettier"
+	draw.Draw(res, rect, imgRes, rect.Min, draw.Src)
 }
 
 //computes the mean and standard deviation of each pixel in the considered pixel's area and then compare it with the pixel considered
@@ -353,10 +351,10 @@ func Dispatch(source *image.RGBA, dest *image.RGBA, filter int, rect image.Recta
 		NoiseReductionBW(source, dest, 2, 5, rect)
 		break
 	case 7:
-		Boundaries(source, dest, 32, rect)
+		Boundaries(source, dest, 22, rect)
 		break
 	case 8:
-		PrewittBorders(source, dest, 32, rect) //à vérifier niveau de puissance selon image
+		PrewittBorders(source, dest, 22, rect) //à vérifier niveau de puissance selon image
 		break
 	}
 
