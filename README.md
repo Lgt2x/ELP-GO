@@ -14,7 +14,7 @@ go run src/server/server.go
 # In another terminal
 go run src/client/client.go
 
-# Or
+# Or (recommended)
 go run src/client/clientcli.go <port> <filter id> <source> <dest>
 ```
 If package `elputils` isn't found, add this project's directory to `$GOPATH` env variable
@@ -26,10 +26,9 @@ If standard packages can't be found, check your `$GOROOT` en var.
 3) Grayscale
 4) Uniform blur
 5) Gauss blur
-6) Boundaries detection (laplacian)
-7) Boundaries detection (Prewitt)
-8) Noise reduction - Black and White
-
+6) Noise reduction - Black and White
+7) Boundaries detection (laplacian)
+8) Boundaries detection (Prewitt)
 
 ## Client-Server communication
 1) Establishing connection
