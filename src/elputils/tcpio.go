@@ -52,7 +52,7 @@ func ReceiveArray(conn net.Conn, delimiter string, delimitEnd byte) []string {
 	return strings.Split(strings.Trim(message, "\n"), delimiter)
 }
 
-// Send a file specified a filename
+// Send a file through TCP, given a filename
 func UploadFile(conn net.Conn, srcFile string) {
 	file, err := os.Open(srcFile)
 	if err != nil {
@@ -66,15 +66,18 @@ func UploadFile(conn net.Conn, srcFile string) {
 		fmt.Println(err)
 		return
 	}
+
+	// Resolve file size and name and send them first
 	fileSize := FillString(strconv.FormatInt(fileInfo.Size(), 10), 10)
 	fileName := FillString(fileInfo.Name(), 64)
-
 	_, _ = conn.Write([]byte(fileSize))
 	_, _ = conn.Write([]byte(fileName))
+
+	// Send the file part by part, using a given buffer size, until we reach the end of the file
 	sendBuffer := make([]byte, BufferSize)
 	for {
 		_, err = file.Read(sendBuffer)
-		if err == io.EOF {
+		if err == io.EOF { // Stop when EOF is reached
 			break
 		}
 
@@ -84,25 +87,27 @@ func UploadFile(conn net.Conn, srcFile string) {
 
 // Receive a file and copy it to specified location
 func ReceiveFile(conn net.Conn, destination string) {
+	// First, receive file name and size
 	bufferFileName := make([]byte, 64)
 	bufferFileSize := make([]byte, 10)
 
 	_, _ = conn.Read(bufferFileSize)
 	fileSize, _ := strconv.ParseInt(strings.Trim(string(bufferFileSize), ":"), 10, 64)
-
-	_, _ = conn.Read(bufferFileName)
-	//fileName := strings.Trim(string(bufferFileName), ":")
+	_, _ = conn.Read(bufferFileName) // Filename is ignored here
 	newFile, err := os.Create(destination)
 
 	if err != nil {
 		panic(err)
 	}
+
 	defer newFile.Close()
 	var receivedBytes int64
 
+	// Receive packets of BufferSize bytes
 	log.Println("Start receiving")
 	for {
 		if (fileSize - receivedBytes) < BufferSize {
+			// The last one is not BufferSize bytes long, so we have to adapt
 			_, _ = io.CopyN(newFile, conn, fileSize-receivedBytes)
 			_, _ = conn.Read(make([]byte, (receivedBytes+BufferSize)-fileSize))
 			break
@@ -111,5 +116,4 @@ func ReceiveFile(conn net.Conn, destination string) {
 		receivedBytes += BufferSize
 	}
 	log.Printf("Received %d bytes\n", fileSize)
-
 }

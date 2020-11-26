@@ -77,6 +77,7 @@ func ReceiveFilter(conn net.Conn, maxFil int) int {
 	return 0
 }
 
+// Verifies if a jpeg image exists at a specified location
 func InputImageVerification(imagePath string) bool {
 	// Only jpg images are supported
 	if !strings.HasSuffix(imagePath, ".jpg") && !strings.HasSuffix(imagePath, ".jpeg") {
@@ -84,7 +85,13 @@ func InputImageVerification(imagePath string) bool {
 		return false
 	}
 
-	// check if the file can be decoded as jpeg or not
+	// Check if the file exists or not
+	// NB: this is already done by the previous lines (os.Open then jpeg.DecodeConfig)
+	if !FileExists(imagePath) {
+		return false
+	}
+
+	// Check if the file can be decoded as jpeg or not
 	input, err := os.Open(imagePath)
 	_, err = jpeg.DecodeConfig(input)
 	if err != nil {
@@ -93,11 +100,6 @@ func InputImageVerification(imagePath string) bool {
 	}
 	input.Close()
 
-	// check if the file exists or not
-	// NB: this is already done by the previous lines (os.Open then jpeg.DecodeConfig)
-	if !FileExists(imagePath) {
-		return false
-	}
 	return true
 }
 
